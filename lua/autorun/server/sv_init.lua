@@ -26,13 +26,23 @@ function SrvDupe.CheckPlyWritePermissions(ply)
 end
 
 AddCSLuaFile("config/sh_config.lua")
+AddCSLuaFile("srvdupe/sh_file.lua")
 AddCSLuaFile("srvdupe/client/cl_control_panel_menu.lua")
 AddCSLuaFile("srvdupe/client/cl_file_browser.lua")
+AddCSLuaFile("srvdupe/client/cl_file.lua")
+
 
 include("config/sh_config.lua")
+include("srvdupe/sh_file.lua")
 include("srvdupe/server/sv_file_browser.lua")
+include("srvdupe/server/sv_file.lua")
 
 
 util.AddNetworkString("SrvDupe_Notify")
 util.AddNetworkString("SrvDupe_AskServerDataContent")
 util.AddNetworkString("SrvDupe_SendServerDataContent")
+util.AddNetworkString("SrvDupe_BroadcastChange")
+util.AddNetworkString("SrvDupe_FileClientToServer")
+util.AddNetworkString("SrvDupe_FileServerToClient")
+util.AddNetworkString("SrvDupe_AskServerForFile")
+

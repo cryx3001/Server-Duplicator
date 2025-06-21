@@ -1,7 +1,6 @@
 local function isAllowed()
     local roles = SrvDupe.Config.AllowedRolesWrite or {}
     PrintTable(roles)
-    print(LocalPlayer():GetUserGroup())
     return table.HasValue(roles, LocalPlayer():GetUserGroup())
 end
 
@@ -13,7 +12,6 @@ local function BuildControlPanel(CPanel)
 
     local FileBrowser = vgui.Create("srvdupe_browser")
     CPanel:AddItem(FileBrowser)
-    print(FileBrowser)
     FileBrowser:SetSize(CPanel:GetWide(), 405)
     SrvDupe.FileBrowser = FileBrowser
 end

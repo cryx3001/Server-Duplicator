@@ -142,24 +142,18 @@ local function GetNodePath(node)
     local name = ""
     node = node.ParentNode
     if (not node.ParentNode) then
-        if (path == "Public") then
+        if (path == "Server Dupes") then
             area = 1
-        elseif (path == "Advanced Duplicator 1") then
-            area = 2
         end
         return "", area
     end
 
     while (true) do
-
         name = node.Label:GetText()
-        if (name == "Advanced Duplicator 2") then
+        if (name == "advdupe2/") then
             break
-        elseif (name == "Public") then
+        elseif (name == "Server Dupes") then
             area = 1
-            break
-        elseif (name == "Advanced Duplicator 1") then
-            area = 2
             break
         end
         path = name .. "/" .. path
@@ -227,8 +221,84 @@ local function GetFullPath(node)
     return path
 end
 
-function BROWSER:DoNodeRightClick(node)
+function addOptionsFileClientside(Menu, node)
+    Menu:AddOption("Upload", function()
+        local path, _ = GetNodePath(node)
+        local dataFolder = SrvDupe.AdvDupe2_Data
+        local fullPath = dataFolder .. "/" .. path
 
+        local fileExists = file.Exists(fullPath, "DATA")
+        if not fileExists then
+            SrvDupe.Notify(ply, "File does not exists anymore!", 1, true)
+            return
+        end
+
+        local content = file.Read(fullPath, "DATA")
+
+        SrvDupe.SendFile(node.Label:GetText(), content)
+    end)
+end
+
+function addOptionsFileServerside(Menu, node)
+    Menu:AddOption("Rename", function()
+
+    end)
+
+    Menu:AddOption("Move", function()
+
+    end)
+
+    Menu:AddOption("Delete", function()
+
+    end)
+
+    Menu:AddSpacer()
+
+    Menu:AddOption("Download", function()
+        local path, _ = GetNodePath(node)
+
+        net.Start("SrvDupe_AskServerForFile")
+            net.WriteString(path)
+        net.SendToServer()
+    end)
+end
+
+function addOptionsFolderServerside(Menu, node)
+    Menu:AddOption("New Folder", function()
+
+    end)
+
+    Menu:AddOption("Delete", function()
+
+    end)
+end
+
+function BROWSER:DoNodeRightClick(node)
+    self:SetSelected(node)
+
+    local parent = self:GetParent():GetParent()
+    parent.FileName:KillFocus()
+    parent.Desc:KillFocus()
+    local Menu = DermaMenu()
+
+    local path, area = GetNodePath(node)
+
+    if (node.Derma.ClassName == "srvdupe_browser_file") then
+        if area == 0 then
+            addOptionsFileClientside(Menu, node)
+        end
+        if area == 1 then
+            addOptionsFileServerside(Menu, node)
+        end
+    end
+
+    if node.Derma.ClassName == "srvdupe_browser_folder" then
+        if area == 1 then
+            addOptionsFolderServerside(Menu, node)
+        end
+    end
+
+    Menu:Open()
 end
 
 local function CollapseParents(node, val)
@@ -521,7 +591,7 @@ local function LoadServerDataContent(tbl, ParentNode)
                 local folder = _ParentNode:AddFolder(k)
                 rec_LoadContent(v, folder)
             else
-                _ParentNode:AddFile(string.StripExtension(v))
+                _ParentNode:AddFile(v)
             end
         end
     end
@@ -536,8 +606,6 @@ function FOLDER:LoadDataFolder(folderPath)
         net.SendToServer()
         return
     end
-
-    print(folderPath)
 
     self:Clear()
     self.LoadingPath = folderPath
@@ -557,7 +625,7 @@ function FOLDER:Think()
                 return
             else
                 local fileName = files[fileI]
-                local fileNode = self:AddFile(string.StripExtension(fileName))
+                local fileNode = self:AddFile(fileName)
                 fileI = fileI + 1
             end
         else
