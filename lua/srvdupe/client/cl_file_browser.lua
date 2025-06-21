@@ -8,11 +8,14 @@
 	Version: 1.0
 ]]
 
+if SERVER then return end
+
 local History = {}
 local Narrow = {}
 
 local switch = true
 local count = 0
+local srvdupe_folder = nil
 
 local function AddHistory(txt)
     txt = string.lower(txt)
@@ -93,7 +96,7 @@ end
 function BROWSERPNL:Init()
     setbrowserpnlsize = self.SetSize
     self.SetSize = SetBrowserPnlSize
-    self.pnlCanvas = vgui.Create("advdupe2_browser_tree", self)
+    self.pnlCanvas = vgui.Create("srvdupe_browser_tree", self)
 
     self:SetPaintBackground(true)
     self:SetPaintBackgroundEnabled(false)
@@ -105,7 +108,7 @@ function BROWSERPNL:OnVScroll(iOffset)
     self.pnlCanvas:SetPos(0, iOffset)
 end
 
-derma.DefineControl("advdupe2_browser_panel", "AD2 File Browser", BROWSERPNL, "Panel")
+derma.DefineControl("srvdupe_browser_panel", "AD2 File Browser", BROWSERPNL, "Panel")
 
 local BROWSER = {}
 AccessorFunc(BROWSER, "m_pSelectedItem", "SelectedItem")
@@ -168,72 +171,15 @@ end
 
 function BROWSER:DoNodeLeftClick(node)
     if (self.m_pSelectedItem == node and CurTime() - self.LastClick <= 0.25) then -- Check for double click
-        if (node.Derma.ClassName == "advdupe2_browser_folder") then
+        if (node.Derma.ClassName == "srvdupe_browser_folder") then
             if (node.Expander) then
                 node:SetExpanded() -- It's a folder, expand/collapse it
             end
-        elseif (node.Derma.ClassName == "advdupe2_browser_file") then
-            if (node.Control.Search) then
-                AdvDupe2.UploadFile(GetNodePath(node.Ref))
-            else
-                AdvDupe2.UploadFile(GetNodePath(node))
-            end
-        else
-            AdvDupe2.UploadFile(GetNodePath(node.Ref))
         end
     else
         self:SetSelected(node) -- A node was clicked, select it
     end
     self.LastClick = CurTime()
-end
-
-local function AddNewFolder(node)
-    local Controller = node.Control:GetParent():GetParent()
-    local name = Controller.FileName:GetValue()
-    local char = string.match(name, "[^%w_ ]")
-    if char then
-        AdvDupe2.Notify("Name contains invalid character ("..char..")!", NOTIFY_ERROR)
-        Controller.FileName:SelectAllOnFocus(true)
-        Controller.FileName:OnGetFocus()
-        Controller.FileName:RequestFocus()
-        return
-    end
-    if (name == "" or name == "Folder_Name...") then
-        AdvDupe2.Notify("Name is blank!", NOTIFY_ERROR)
-        Controller.FileName:SelectAllOnFocus(true)
-        Controller.FileName:OnGetFocus()
-        Controller.FileName:RequestFocus()
-        return
-    end
-    local path, area = GetNodePath(node)
-    if (area == 0) then
-        path = AdvDupe2.DataFolder .. "/" .. path .. "/" .. name
-    elseif (area == 1) then
-        path = AdvDupe2.DataFolder .. "/=Public=/" .. path .. "/" .. name
-    else
-        path = "adv_duplicator/" .. path .. "/" .. name
-    end
-
-    if (file.IsDir(path, "DATA")) then
-        AdvDupe2.Notify("Folder name already exists.", NOTIFY_ERROR)
-        Controller.FileName:SelectAllOnFocus(true)
-        Controller.FileName:OnGetFocus()
-        Controller.FileName:RequestFocus()
-        return
-    end
-    file.CreateDir(path)
-
-    local Folder = node:AddFolder(name)
-    node.Control:Sort(node)
-
-    if (not node.m_bExpanded) then
-        node:SetExpanded()
-    end
-
-    node.Control:SetSelected(Folder)
-    if (Controller.Expanded) then
-        AdvDupe2.FileBrowser:Slide(false)
-    end
 end
 
 local function CollapseChildren(node)
@@ -256,9 +202,9 @@ local function CollapseParentsComplete(node)
     CollapseParentsComplete(node.ParentNode)
 end
 
-function AdvDupe2.GetFilename(path, overwrite)
+function SrvDupe.GetFilename(path, overwrite)
     if not overwrite and file.Exists(path .. ".txt", "DATA") then
-        for i = 1, AdvDupe2.FileRenameTryLimit do
+        for i = 1, 10 do
             local p = string.format("%s_%03d.txt", path, i)
             if not file.Exists(p, "DATA") then
                 return p
@@ -272,7 +218,7 @@ end
 local function GetFullPath(node)
     local path, area = GetNodePath(node)
     if (area == 0) then
-        path = AdvDupe2.DataFolder .. "/" .. path .. "/"
+        path = SrvDupe.AdvDupe2_Data .. "/" .. path .. "/"
     elseif (area == 1) then
 
     else
@@ -281,434 +227,8 @@ local function GetFullPath(node)
     return path
 end
 
-local function GetNodeRoot(node)
-    local Root
-    while (true) do
-        if (not node.ParentNode.ParentNode) then
-            Root = node
-            break
-        end
-        node = node.ParentNode
-    end
-    return Root
-end
-
-local function RenameFileCl(node, name)
-    local path, area = GetNodePath(node)
-    local File, FilePath, tempFilePath = "", "", ""
-    if (area == 0) then
-        tempFilePath = AdvDupe2.DataFolder .. "/" .. path
-    elseif (area == 1) then
-        tempFilePath = AdvDupe2.DataFolder .. "/=Public=/" .. path
-    elseif (area == 2) then
-        tempFilePath = "adv_duplicator/" .. path
-    end
-
-    File = file.Read(tempFilePath .. ".txt")
-    FilePath = AdvDupe2.GetFilename(
-            string.sub(tempFilePath, 1, #tempFilePath - #node.Label:GetText()) .. name)
-
-    if (not FilePath) then
-        AdvDupe2.Notify("Rename limit exceeded, could not rename.", NOTIFY_ERROR)
-        return
-    end
-
-    FilePath = AdvDupe2.SanitizeFilename(FilePath)
-    file.Write(FilePath, File)
-    if (file.Exists(FilePath, "DATA")) then
-        file.Delete(tempFilePath .. ".txt")
-        local NewName = string.Explode("/", FilePath)
-        NewName = string.sub(NewName[#NewName], 1, -5)
-        node.Label:SetText(NewName)
-        node.Label:SizeToContents()
-        AdvDupe2.Notify("File renamed to " .. NewName)
-    else
-        AdvDupe2.Notify("File was not renamed.", NOTIFY_ERROR)
-    end
-
-    node.Control:Sort(node.ParentNode)
-end
-
-local function MoveFileClient(node)
-    if (not node) then
-        AdvDupe2.Notify("Select a folder to move the file to.", NOTIFY_ERROR)
-        return
-    end
-    if (node.Derma.ClassName == "advdupe2_browser_file") then
-        AdvDupe2.Notify("You muse select a folder as a destination.", NOTIFY_ERROR)
-        return
-    end
-    local base = AdvDupe2.DataFolder
-    local ParentNode
-
-    local node2 = node.Control.ActionNode
-    local path, area = GetNodePath(node2)
-    local path2, area2 = GetNodePath(node)
-
-    if (area ~= area2 or path == path2) then
-        AdvDupe2.Notify("Cannot move files between these directories.", NOTIFY_ERROR)
-        return
-    end
-    if (area == 2) then base = "adv_duplicator" end
-
-    local savepath = AdvDupe2.GetFilename(
-            base .. "/" .. path2 .. "/" .. node2.Label:GetText())
-    local OldFile = base .. "/" .. path .. ".txt"
-
-    local ReFile = file.Read(OldFile)
-    file.Write(savepath, ReFile)
-    file.Delete(OldFile)
-    local name2 = string.Explode("/", savepath)
-    name2 = string.sub(name2[#name2], 1, -5)
-    node2.Control:RemoveNode(node2)
-    node2 = node:AddFile(name2)
-    node2.Control:Sort(node)
-    AdvDupe2.FileBrowser:Slide(false)
-    AdvDupe2.FileBrowser.Info:SetVisible(false)
-end
-
-local function DeleteFilesInFolders(path)
-    local files, folders = file.Find(path .. "*", "DATA")
-
-    for k, v in pairs(files) do file.Delete(path .. v) end
-
-    for k, v in pairs(folders) do DeleteFilesInFolders(path .. v .. "/") end
-
-    file.Delete(path)
-end
-
-local function SearchNodes(node, name)
-    local tab = {}
-    for k, v in pairs(node.Files) do
-        if (string.find(string.lower(v.Label:GetText()), name)) then
-            table.insert(tab, v)
-        end
-    end
-
-    for k, v in pairs(node.Folders) do
-        for i, j in pairs(SearchNodes(v, name)) do
-            table.insert(tab, j)
-        end
-    end
-
-    return tab
-end
-
-local function Search(node, name)
-    local pnFileBr = AdvDupe2.FileBrowser
-    pnFileBr.Search = vgui.Create("advdupe2_browser_panel", pnFileBr)
-    pnFileBr.Search:SetPos(pnFileBr.Browser:GetPos())
-    pnFileBr.Search:SetSize(pnFileBr.Browser:GetSize())
-    pnFileBr.Search.pnlCanvas.Search = true
-    pnFileBr.Browser:SetVisible(false)
-    local Files = SearchNodes(node, name)
-    tableSortNodes(Files)
-    for k, v in pairs(Files) do
-        pnFileBr.Search.pnlCanvas:AddFile(v.Label:GetText()).Ref = v
-    end
-end
-
 function BROWSER:DoNodeRightClick(node)
-    self:SetSelected(node)
 
-    local parent = self:GetParent():GetParent()
-    parent.FileName:KillFocus()
-    parent.Desc:KillFocus()
-    local Menu = DermaMenu()
-    local root = GetNodeRoot(node).Label:GetText()
-    if (node.Derma.ClassName == "advdupe2_browser_file") then
-        if (node.Control.Search) then
-            Menu:AddOption("Open", function()
-                AdvDupe2.UploadFile(GetNodePath(node.Ref))
-            end)
-            Menu:AddOption("Preview", function()
-                local ReadPath, ReadArea = GetNodePath(node.Ref)
-                if (ReadArea == 0) then
-                    ReadPath = AdvDupe2.DataFolder .. "/" .. ReadPath .. ".txt"
-                elseif (ReadArea == 1) then
-                    ReadPath = AdvDupe2.DataFolder .. "/-Public-/" .. ReadPath .. ".txt"
-                else
-                    ReadPath = "adv_duplicator/" .. ReadPath .. ".txt"
-                end
-                if (not file.Exists(ReadPath, "DATA")) then
-                    AdvDupe2.Notify("File does not exist", NOTIFY_ERROR)
-                    return
-                end
-
-                local read = file.Read(ReadPath)
-                local name = string.Explode("/", ReadPath)
-                name = name[#name]
-                name = string.sub(name, 1, #name - 4)
-                local success, dupe, info, moreinfo = AdvDupe2.Decode(read)
-                if (success) then
-                    AdvDupe2.LoadGhosts(dupe, info, moreinfo, name, true)
-                end
-            end)
-        else
-            Menu:AddOption("Open", function()
-                AdvDupe2.UploadFile(GetNodePath(node))
-            end)
-            Menu:AddOption("Preview", function()
-                local ReadPath, ReadArea = GetNodePath(node)
-                if (ReadArea == 0) then
-                    ReadPath = AdvDupe2.DataFolder .. "/" .. ReadPath .. ".txt"
-                elseif (ReadArea == 1) then
-                    ReadPath = AdvDupe2.DataFolder .. "/-Public-/" .. ReadPath .. ".txt"
-                else
-                    ReadPath = "adv_duplicator/" .. ReadPath .. ".txt"
-                end
-                if (not file.Exists(ReadPath, "DATA")) then
-                    AdvDupe2.Notify("File does not exist", NOTIFY_ERROR)
-                    return
-                end
-
-                local read = file.Read(ReadPath)
-                local name = string.Explode("/", ReadPath)
-                name = name[#name]
-                name = string.sub(name, 1, #name - 4)
-                local success, dupe, info, moreinfo = AdvDupe2.Decode(read)
-                if (success) then
-                    AdvDupe2.LoadGhosts(dupe, info, moreinfo, name, true)
-                end
-            end)
-            Menu:AddSpacer()
-            Menu:AddOption("Rename", function()
-                if (parent.Expanding) then return end
-                parent.Submit:SetMaterial("icon16/page_edit.png")
-                parent.Submit:SetTooltip("Rename File")
-                parent.Desc:SetVisible(false)
-                parent.Info:SetVisible(false)
-                parent.FileName.FirstChar = true
-                parent.FileName.PrevText = parent.FileName:GetValue()
-                parent.FileName:SetVisible(true)
-                parent.FileName:SetText(node.Label:GetText())
-                parent.FileName:SelectAllOnFocus(true)
-                parent.FileName:OnMousePressed()
-                parent.FileName:RequestFocus()
-                parent.Expanding = true
-                AdvDupe2.FileBrowser:Slide(true)
-                parent.Submit.DoClick = function()
-                    local name = parent.FileName:GetValue()
-                    if (name == "") then
-                        AdvDupe2.Notify("Name field is blank.", NOTIFY_ERROR)
-                        parent.FileName:SelectAllOnFocus(true)
-                        parent.FileName:OnGetFocus()
-                        parent.FileName:RequestFocus()
-                        return
-                    end
-                    AddHistory(name)
-                    RenameFileCl(node, name)
-                    AdvDupe2.FileBrowser:Slide(false)
-                end
-                parent.FileName.OnEnter = parent.Submit.DoClick
-            end)
-            Menu:AddOption("Move File", function()
-                parent.Submit:SetMaterial("icon16/page_paste.png")
-                parent.Submit:SetTooltip("Move File")
-                parent.FileName:SetVisible(false)
-                parent.Desc:SetVisible(false)
-                parent.Info:SetText(
-                        "Select the folder you want to move \nthe File to.")
-                parent.Info:SizeToContents()
-                parent.Info:SetVisible(true)
-                AdvDupe2.FileBrowser:Slide(true)
-                node.Control.ActionNode = node
-                parent.Submit.DoClick = function()
-                    MoveFileClient(node.Control.m_pSelectedItem)
-                end
-            end)
-            Menu:AddOption("Delete", function()
-                parent.Submit:SetMaterial("icon16/bin_empty.png")
-                parent.Submit:SetTooltip("Delete File")
-                parent.FileName:SetVisible(false)
-                parent.Desc:SetVisible(false)
-                if (#node.Label:GetText() > 22) then
-                    parent.Info:SetText(
-                            'Are you sure that you want to delete \nthe FILE, "' ..
-                                    node.Label:GetText() .. '" \nfrom your CLIENT?')
-                else
-                    parent.Info:SetText(
-                            'Are you sure that you want to delete \nthe FILE, "' ..
-                                    node.Label:GetText() .. '" from your CLIENT?')
-                end
-                parent.Info:SizeToContents()
-                parent.Info:SetVisible(true)
-                AdvDupe2.FileBrowser:Slide(true)
-                parent.Submit.DoClick = function()
-                    local path, area = GetNodePath(node)
-                    if (area == 1) then
-                        path = "-Public-/" .. path
-                    end
-                    if (area == 2) then
-                        path = "adv_duplicator/" .. path .. ".txt"
-                    else
-                        path = AdvDupe2.DataFolder .. "/" .. path .. ".txt"
-                    end
-                    node.Control:RemoveNode(node)
-                    file.Delete(path)
-                    AdvDupe2.FileBrowser:Slide(false)
-                end
-            end)
-        end
-    else
-        if (root ~= "-Advanced Duplicator 1-") then
-            Menu:AddOption("Save", function()
-                if (parent.Expanding) then return end
-                parent.Submit:SetMaterial("icon16/page_save.png")
-                parent.Submit:SetTooltip("Save Duplication")
-                if (parent.FileName:GetValue() == "Folder_Name...") then
-                    parent.FileName:SetText("File_Name...")
-                end
-                parent.Desc:SetVisible(true)
-                parent.Info:SetVisible(false)
-                parent.FileName.FirstChar = true
-                parent.FileName.PrevText = parent.FileName:GetValue()
-                parent.FileName:SetVisible(true)
-                parent.FileName:SelectAllOnFocus(true)
-                parent.FileName:OnMousePressed()
-                parent.FileName:RequestFocus()
-                node.Control.ActionNode = node
-                parent.Expanding = true
-                AdvDupe2.FileBrowser:Slide(true)
-                parent.Submit.DoClick = function()
-                    local name = parent.FileName:GetValue()
-                    if (name == "" or name == "File_Name...") then
-                        AdvDupe2.Notify("Name field is blank.", NOTIFY_ERROR)
-                        parent.FileName:SelectAllOnFocus(true)
-                        parent.FileName:OnGetFocus()
-                        parent.FileName:RequestFocus()
-                        return
-                    end
-                    local desc = parent.Desc:GetValue()
-                    if (desc == "Description...") then
-                        desc = ""
-                    end
-                    AdvDupe2.SavePath = GetFullPath(node) .. name
-                    AddHistory(name)
-                    if (game.SinglePlayer()) then
-                        RunConsoleCommand("AdvDupe2_SaveFile", name, desc, GetNodePath(node))
-                    else
-                        RunConsoleCommand("AdvDupe2_SaveFile", name)
-                    end
-                    AdvDupe2.FileBrowser:Slide(false)
-                end
-                parent.FileName.OnEnter =
-                function()
-                    parent.FileName:KillFocus()
-                    parent.Desc:SelectAllOnFocus(true)
-                    parent.Desc.OnMousePressed()
-                    parent.Desc:RequestFocus()
-                end
-                parent.Desc.OnEnter = parent.Submit.DoClick
-            end)
-        end
-        Menu:AddOption("New Folder", function()
-            if (parent.Expanding) then return end
-            parent.Submit:SetMaterial("icon16/folder_add.png")
-            parent.Submit:SetTooltip("Add new folder")
-            if (parent.FileName:GetValue() == "File_Name...") then
-                parent.FileName:SetText("Folder_Name...")
-            end
-            parent.Desc:SetVisible(false)
-            parent.Info:SetVisible(false)
-            parent.FileName.FirstChar = true
-            parent.FileName.PrevText = parent.FileName:GetValue()
-            parent.FileName:SetVisible(true)
-            parent.FileName:SelectAllOnFocus(true)
-            parent.FileName:OnMousePressed()
-            parent.FileName:RequestFocus()
-            parent.Expanding = true
-            AdvDupe2.FileBrowser:Slide(true)
-            parent.Submit.DoClick = function() AddNewFolder(node) end
-            parent.FileName.OnEnter = parent.Submit.DoClick
-        end)
-        Menu:AddOption("Search", function()
-            parent.Submit:SetMaterial("icon16/find.png")
-            parent.Submit:SetTooltip("Search Files")
-            if (parent.FileName:GetValue() == "Folder_Name...") then
-                parent.FileName:SetText("File_Name...")
-            end
-            parent.Desc:SetVisible(false)
-            parent.Info:SetVisible(false)
-            parent.FileName.FirstChar = true
-            parent.FileName.PrevText = parent.FileName:GetValue()
-            parent.FileName:SetVisible(true)
-            parent.FileName:SelectAllOnFocus(true)
-            parent.FileName:OnMousePressed()
-            parent.FileName:RequestFocus()
-            parent.Expanding = true
-            AdvDupe2.FileBrowser:Slide(true)
-            parent.Submit.DoClick = function()
-                Search(node, string.lower(parent.FileName:GetValue()))
-                AddHistory(parent.FileName:GetValue())
-                parent.FileName:SetVisible(false)
-                parent.Submit:SetMaterial("icon16/arrow_undo.png")
-                parent.Submit:SetTooltip("Return to Browser")
-                parent.Info:SetVisible(true)
-                parent.Info:SetText(#parent.Search.pnlCanvas.Files ..
-                        ' files found searching for, "' ..
-                        parent.FileName:GetValue() .. '"')
-                parent.Info:SizeToContents()
-                parent.Submit.DoClick = function()
-                    parent.Search:Remove()
-                    parent.Search = nil
-                    parent.Browser:SetVisible(true)
-                    AdvDupe2.FileBrowser:Slide(false)
-                    parent.Cancel:SetVisible(true)
-                end
-                parent.Cancel:SetVisible(false)
-            end
-            parent.FileName.OnEnter = parent.Submit.DoClick
-        end)
-        if (node.Label:GetText()[1] ~= "-") then
-            Menu:AddOption("Delete", function()
-                parent.Submit:SetMaterial("icon16/bin_empty.png")
-                parent.Submit:SetTooltip("Delete Folder")
-                parent.FileName:SetVisible(false)
-                parent.Desc:SetVisible(false)
-                if (#node.Label:GetText() > 22) then
-                    parent.Info:SetText(
-                            'Are you sure that you want to delete \nthe FOLDER, "' ..
-                                    node.Label:GetText() .. '" \nfrom your CLIENT?')
-                else
-                    parent.Info:SetText(
-                            'Are you sure that you want to delete \nthe FOLDER, "' ..
-                                    node.Label:GetText() .. '" from your CLIENT?')
-                end
-                parent.Info:SizeToContents()
-                parent.Info:SetVisible(true)
-                AdvDupe2.FileBrowser:Slide(true)
-                parent.Submit.DoClick = function()
-                    local path, area = GetNodePath(node)
-                    if (area == 1) then
-                        path = "-Public-/" .. path
-                    end
-                    if (area == 2) then
-                        path = "adv_duplicator/" .. path .. "/"
-                    else
-                        path = AdvDupe2.DataFolder .. "/" .. path .. "/"
-                    end
-                    node.Control:RemoveNode(node)
-                    DeleteFilesInFolders(path)
-                    AdvDupe2.FileBrowser:Slide(false)
-                end
-            end)
-        end
-    end
-    if (not node.Control.Search) then
-        Menu:AddSpacer()
-        Menu:AddOption("Collapse Folder", function()
-            if (node.ParentNode.ParentNode) then
-                node.ParentNode:SetExpanded(false)
-            end
-        end)
-        Menu:AddOption("Collapse Root", function() CollapseParentsComplete(node) end)
-        if (parent.Expanded) then
-            Menu:AddOption("Cancel Action", function() parent.Cancel:DoClick() end)
-        end
-    end
-
-    Menu:Open()
 end
 
 local function CollapseParents(node, val)
@@ -766,7 +286,7 @@ function BROWSER:OnMouseWheeled(dlta)
 end
 
 function BROWSER:AddFolder(text)
-    local node = vgui.Create("advdupe2_browser_folder", self)
+    local node = vgui.Create("srvdupe_browser_folder", self)
     node.Control = self
 
     node.Offset = 0
@@ -787,7 +307,7 @@ function BROWSER:AddFolder(text)
 end
 
 function BROWSER:AddFile(text)
-    local node = vgui.Create("advdupe2_browser_file", self)
+    local node = vgui.Create("srvdupe_browser_file", self)
     node.Control = self
     node.Offset = 0
     node.Icon:SetPos(18, 1)
@@ -877,7 +397,7 @@ function BROWSER:DeleteNode()
     self:RemoveNode(self.ActionNode)
 end
 
-derma.DefineControl("advdupe2_browser_tree", "AD2 File Browser", BROWSER, "Panel")
+derma.DefineControl("srvdupe_browser_tree", "AD2 File Browser", BROWSER, "Panel")
 
 local FOLDER = {}
 
@@ -925,7 +445,7 @@ function FOLDER:AddFolder(text)
         self.Expander:SetPos(self.Offset, 2)
     end
 
-    local node = vgui.Create("advdupe2_browser_folder", self.ChildList)
+    local node = vgui.Create("srvdupe_browser_folder", self.ChildList)
     node.Control = self.Control
 
     node.Offset = self.Offset + 20
@@ -958,6 +478,13 @@ function FOLDER:Clear()
     self.Nodes = 0
 end
 
+function FOLDER:DeepClear()
+    for _, node in ipairs(self.Folders) do
+        node:Clear()
+    end
+    self:Clear()
+end
+
 function FOLDER:AddFile(text)
     if (self.Nodes == 0) then
         self.Expander = vgui.Create("DExpandButton", self)
@@ -965,7 +492,7 @@ function FOLDER:AddFile(text)
         self.Expander:SetPos(self.Offset, 2)
     end
 
-    local node = vgui.Create("advdupe2_browser_file", self.ChildList)
+    local node = vgui.Create("srvdupe_browser_file", self.ChildList)
     node.Control = self.Control
     node.Offset = self.Offset + 20
     node.Icon:SetPos(18 + node.Offset, 1)
@@ -985,8 +512,33 @@ function FOLDER:AddFile(text)
     return node
 end
 
+local function LoadServerDataContent(tbl, ParentNode)
+    local function rec_LoadContent(_tbl, _ParentNode)
+        for k, v in pairs(_tbl) do
+            local isDir = istable(v)
+
+            if isDir then
+                local folder = _ParentNode:AddFolder(k)
+                rec_LoadContent(v, folder)
+            else
+                _ParentNode:AddFile(string.StripExtension(v))
+            end
+        end
+    end
+
+    rec_LoadContent(tbl, ParentNode)
+    ParentNode.Control:Sort(ParentNode)
+end
 
 function FOLDER:LoadDataFolder(folderPath)
+    if folderPath == "SERVER_DATA" then
+        net.Start("SrvDupe_AskServerDataContent")
+        net.SendToServer()
+        return
+    end
+
+    print(folderPath)
+
     self:Clear()
     self.LoadingPath = folderPath
     self.LoadingFiles, self.LoadingDirectories = file.Find(folderPath .. "*", "DATA", "nameasc")
@@ -1017,11 +569,6 @@ function FOLDER:Think()
 
         self.FileI = fileI
         self.DirI = dirI
-
-        if self.LoadingFirst then
-            if self.LoadingPath == "advdupe2/" then self:SetExpanded(true) end
-            self.LoadingFirst = false
-        end
     end
 end
 
@@ -1057,7 +604,7 @@ function FOLDER:OnMousePressed(code)
     end
 end
 
-derma.DefineControl("advdupe2_browser_folder", "AD2 Browser Folder node", FOLDER, "Panel")
+derma.DefineControl("srvdupe_browser_folder", "AD2 Browser Folder node", FOLDER, "Panel")
 
 local FILE = {}
 
@@ -1101,7 +648,7 @@ function FILE:OnMousePressed(code)
     end
 end
 
-derma.DefineControl("advdupe2_browser_file", "AD2 Browser File node", FILE, "Panel")
+derma.DefineControl("srvdupe_browser_file", "AD2 Browser File node", FILE, "Panel")
 
 local PANEL = {}
 AccessorFunc(PANEL, "m_bBackground", "PaintBackground", FORCE_BOOL)
@@ -1160,7 +707,7 @@ end
 
 local function UpdateClientFiles()
 
-    local pnlCanvas = AdvDupe2.FileBrowser.Browser.pnlCanvas
+    local pnlCanvas = SrvDupe.FileBrowser.Browser.pnlCanvas
 
     for i = 1, 2 do
         if (pnlCanvas.Folders[1]) then
@@ -1168,12 +715,13 @@ local function UpdateClientFiles()
         end
     end
 
-    local advdupe2 = pnlCanvas:AddFolder("Advanced Duplicator 2")
-    local advdupe1 = pnlCanvas:AddFolder("Advanced Duplicator 1")
+    local advdupe2 = pnlCanvas:AddFolder("advdupe2/")
+    srvdupe_folder = pnlCanvas:AddFolder("Server Dupes")
 
-    advdupe1:LoadDataFolder("adv_duplicator/")
     advdupe2:LoadDataFolder("advdupe2/")
+    srvdupe_folder:LoadDataFolder("SERVER_DATA")
 
+--[[
     if (pnlCanvas.Folders[2]) then
         if (#pnlCanvas.Folders[2].Folders == 0 and #pnlCanvas.Folders[2].Files == 0) then
             pnlCanvas:RemoveNode(pnlCanvas.Folders[2])
@@ -1184,12 +732,13 @@ local function UpdateClientFiles()
         pnlCanvas.Folders[1].ChildList:SetParent(nil)
         pnlCanvas.Folders[1].ChildList:SetParent(pnlCanvas.ChildList)
     end
+]]
 
 end
 
 function PANEL:Init()
 
-    AdvDupe2.FileBrowser = self
+    SrvDupe.FileBrowser = self
     self.Expanded = false
     self.Expanding = false
     self.LastX = 0
@@ -1201,7 +750,7 @@ function PANEL:Init()
     self:SetPaintBackgroundEnabled(false)
     self:SetBackgroundColor(self:GetSkin().bg_color_bright)
 
-    self.Browser = vgui.Create("advdupe2_browser_panel", self)
+    self.Browser = vgui.Create("srvdupe_browser_panel", self)
     UpdateClientFiles()
     self.Refresh = vgui.Create("DImageButton", self)
     self.Refresh:SetMaterial("icon16/arrow_refresh.png")
@@ -1234,7 +783,7 @@ function PANEL:Init()
     self.Submit:SetTooltip("Confirm Action")
     self.Submit.DoClick = function()
         self.Expanding = true
-        AdvDupe2.FileBrowser:Slide(false)
+        SrvDupe.FileBrowser:Slide(false)
     end
 
     self.Cancel = vgui.Create("DImageButton", self)
@@ -1243,7 +792,7 @@ function PANEL:Init()
     self.Cancel:SetTooltip("Cancel Action")
     self.Cancel.DoClick = function()
         self.Expanding = true
-        AdvDupe2.FileBrowser:Slide(false)
+        SrvDupe.FileBrowser:Slide(false)
     end
 
     self.FileName = vgui.Create("DTextEntry", self)
@@ -1424,10 +973,21 @@ function PANEL:GetNodePath(node)
     return GetNodePath(node)
 end
 
+net.Receive("SrvDupe_SendServerDataContent", function()
+    local tbl = net.ReadTable()
+    LoadServerDataContent(tbl, srvdupe_folder)
+
+    --timer.Create("SrvDupe_autoRefresh", 5, 0, function()
+    --    net.Start("SrvDupe_AskServerDataContent")
+    --    net.SendToServer()
+    --    return
+    --end)
+end)
+
 if (game.SinglePlayer()) then
-    net.Receive("AdvDupe2_AddFile", function()
-        local asvNode = AdvDupe2.FileBrowser.AutoSaveNode
-        local actNode = AdvDupe2.FileBrowser.Browser.pnlCanvas.ActionNode
+    net.Receive("SrvDupe_AddFile", function()
+        local asvNode = SrvDupe.FileBrowser.AutoSaveNode
+        local actNode = SrvDupe.FileBrowser.Browser.pnlCanvas.ActionNode
         if (net.ReadBool()) then
             if (IsValid(asvNode)) then
                 local name = net.ReadString()
@@ -1444,4 +1004,4 @@ if (game.SinglePlayer()) then
     end)
 end
 
-vgui.Register("advdupe2_browser", PANEL, "Panel")
+vgui.Register("srvdupe_browser", PANEL, "Panel")

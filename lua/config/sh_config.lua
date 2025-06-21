@@ -7,6 +7,5 @@ SrvDupe.Config = {
         "owner",
         "superadmin",
         "admin"
-    },
-    AdvDupe2_Data = "advdupe2"
+    }
 }
