@@ -1,5 +1,8 @@
 SrvDupe = {
-    DataFolder = "srvdupe"
+    DataFolder = "srvdupe",
+    old_CheckLimit = nil,
+    old_CheckRestriction = nil,
+    old_AddCount = nil,
 }
 
 print("[SrvDupe]\tHello World!")
@@ -25,6 +28,40 @@ function SrvDupe.CheckPlyWritePermissions(ply)
     return table.HasValue(roles, ply:GetUserGroup())
 end
 
+function SrvDupe.ApplyCustomRestrictions()
+    if SrvDupe.old_CheckLimit or SrvDupe.old_CheckRestriction then return end
+
+    local ENT = FindMetaTable("Player")
+
+    SrvDupe.old_CheckLimit = ENT.CheckLimit
+    SrvDupe.old_CheckRestriction = ENT.CheckRestriction
+    SrvDupe.old_AddCount = ENT.AddCount
+
+    ENT.CheckLimit = function(ply, ent) return true end
+    ENT.CheckRestriction = function(ply, ent) return true end
+    ENT.AddCount = function (str, ent) return end
+    --print("SrvDupe.ApplyCustomRestrictions()")
+end
+
+function SrvDupe.RevertCustomRestrictions()
+    if not SrvDupe.old_CheckLimit or not SrvDupe.old_CheckRestriction then return end
+
+    local ENT = FindMetaTable("Player")
+
+    ENT.CheckLimit = SrvDupe.old_CheckLimit
+    ENT.CheckRestriction = SrvDupe.old_CheckRestriction
+    ENT.AddCount = SrvDupe.old_AddCount
+
+    SrvDupe.old_CheckLimit = nil
+    SrvDupe.old_CheckRestriction = nil
+    SrvDupe.old_AddCount = nil
+    --print("SrvDupe.RevertCustomRestrictions()")
+end
+
+hook.Add("PlayerInitialSpawn","SrvDupe_AddPlayerTable",function(ply)
+    ply.SrvDupe = {}
+end)
+
 AddCSLuaFile("config/sh_config.lua")
 AddCSLuaFile("srvdupe/sh_codec.lua")
 AddCSLuaFile("srvdupe/sh_codec_legacy.lua")
@@ -38,6 +75,7 @@ include("config/sh_config.lua")
 include("srvdupe/sh_codec.lua")
 include("srvdupe/sh_codec_legacy.lua")
 include("srvdupe/sh_file.lua")
+
 include("srvdupe/server/sv_clipboard.lua")
 include("srvdupe/server/sv_file.lua")
 include("srvdupe/server/sv_file_browser.lua")
@@ -54,7 +92,7 @@ concommand.Add("srvdupe_spawn", function(ply, cmd, args)
         return
     end
 
-    SrvDupe.LoadAndPaste(relativePath, nil, nil)
+    SrvDupe.LoadAndPaste(relativePath, nil, nil, ply)
 end)
 
 util.AddNetworkString("SrvDupe_Notify")

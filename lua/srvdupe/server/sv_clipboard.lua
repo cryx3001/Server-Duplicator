@@ -84,7 +84,6 @@ local function CreateConstraintFromTable(Constraint, EntityList, EntityTable, Pl
     local Factory = duplicator.ConstraintType[Constraint.Type]
     if not Factory then return end
 
-    if Player and not Player:CheckLimit( "constraints" ) then return end
     local first, firstindex -- Ent1 or Ent in the constraint's table
     local second, secondindex -- Any other Ent that is not Ent1 or Ent
     local Args = {} -- Build the argument list for the Constraint's spawn function
@@ -224,10 +223,6 @@ local function CreateConstraintFromTable(Constraint, EntityList, EntityTable, Pl
             print("DUPLICATOR: ERROR, Failed to create " .. Constraint.Type .. " Constraint!")
         end
         return
-    end
-
-    if Player then
-        Player:AddCount( "constraints", Ent )
     end
 
     Ent.BuildDupeInfo = table.Copy(buildInfo)
@@ -449,11 +444,11 @@ local function MakeProp(Player, Pos, Ang, Model, PhysicsObject, Data)
     Data.Model = Model
     Data.Frozen = true
     -- Make sure this is allowed
-    if (Player) then
-        if (not gamemode.Call("PlayerSpawnProp", Player, Model)) then
-            return false
-        end
-    end
+    --if (Player) then
+    --    if (not gamemode.Call("PlayerSpawnProp", Player, Model)) then
+    --        return false
+    --    end
+    --end
 
     local Prop = ents.Create("prop_physics")
     if not IsValid(Prop) then return false end
@@ -483,44 +478,46 @@ end
 	Returns: nil
 ]]
 local function IsAllowed(Player, Class, EntityClass)
-    if (scripted_ents.GetMember(Class, "DoNotDuplicate")) then return false end
-
-    if (IsValid(Player) and not Player:IsAdmin()) then
-        if not duplicator.IsAllowed(Class) then return false end
-
-        local weapon = list.GetForEdit("Weapon")[Class]
-
-        if weapon then
-            if (not weapon.Spawnable) then return false end
-            if (weapon.AdminOnly) then return false end
-        else
-            if (not scripted_ents.GetMember(Class, "Spawnable") and not EntityClass) then return false end
-            if (scripted_ents.GetMember(Class, "AdminOnly")) then return false end
-        end
-    end
-
     return true
+    --if (scripted_ents.GetMember(Class, "DoNotDuplicate")) then return false end
+    --
+    --if (IsValid(Player) and not Player:IsAdmin()) then
+    --    if not duplicator.IsAllowed(Class) then return false end
+    --
+    --    local weapon = list.GetForEdit("Weapon")[Class]
+    --
+    --    if weapon then
+    --        if (not weapon.Spawnable) then return false end
+    --        if (weapon.AdminOnly) then return false end
+    --    else
+    --        if (not scripted_ents.GetMember(Class, "Spawnable") and not EntityClass) then return false end
+    --        if (scripted_ents.GetMember(Class, "AdminOnly")) then return false end
+    --    end
+    --end
+    --
+    --return true
 end
 
 local function CreateEntityFromTable(EntTable, Player)
-    hook.Run("SrvDupe_PreCreateEntity", EntTable, Player)
+    hook.Run("AdvDupe_PreCreateEntity", EntTable, Player)
 
     local EntityClass = duplicator.FindEntityClass(EntTable.Class)
-    if not IsAllowed(Player, EntTable.Class, EntityClass) then
-        Player:ChatPrint([[Entity Class Black listed, "]] .. EntTable.Class .. [["]])
-        return nil
-    end
 
-    local canCreate, blockReason = hook.Run( "SrvDupe_CanCreateEntity", Player, EntTable.Class )
-    if canCreate == false then
-        local msg = [[Entity Class, "]] .. EntTable.Class .. [[" is Blocked! ]]
-        if isstring( blockReason ) then -- allow nil blockReason
-            msg = msg .. blockReason
-
-        end
-        Player:ChatPrint( msg )
-        return nil
-    end
+    --if not IsAllowed(Player, EntTable.Class, EntityClass) then
+    --    Player:ChatPrint([[Entity Class Black listed, "]] .. EntTable.Class .. [["]])
+    --    return nil
+    --end
+    --
+    --local canCreate, blockReason = hook.Run( "SrvDupe_CanCreateEntity", Player, EntTable.Class )
+    --if canCreate == false then
+    --    local msg = [[Entity Class, "]] .. EntTable.Class .. [[" is Blocked! ]]
+    --    if isstring( blockReason ) then -- allow nil blockReason
+    --        msg = msg .. blockReason
+    --
+    --    end
+    --    Player:ChatPrint( msg )
+    --    return nil
+    --end
 
     local sent = false
     local status, valid
@@ -556,12 +553,14 @@ local function CreateEntityFromTable(EntTable, Player)
             sent = true
         end
 
-        if IsAllowed(Player, EntTable.Class, EntityClass) then
-            status, valid = pcall(GenericDuplicatorFunction, EntTable, Player)
-        else
-            print("Advanced Duplicator 2: ENTITY CLASS IS BLACKLISTED, CLASS NAME: " .. EntTable.Class)
-            return nil
-        end
+        status, valid = pcall(GenericDuplicatorFunction, EntTable, Player)
+
+        --if IsAllowed(Player, EntTable.Class, EntityClass) then
+        --    status, valid = pcall(GenericDuplicatorFunction, EntTable, Player)
+        --else
+        --    print("Advanced Duplicator 2: ENTITY CLASS IS BLACKLISTED, CLASS NAME: " .. EntTable.Class)
+        --    return nil
+        --end
     end
 
     if (not GENERIC) then
@@ -597,7 +596,7 @@ local function CreateEntityFromTable(EntTable, Player)
         -- Create and return the entity
         if (EntTable.Class == "prop_physics") then
             valid = MakeProp(Player, unpack(ArgList, 1, #EntityClass.Args)) -- Create prop_physics like this because if the model doesn't exist it will cause
-        elseif IsAllowed(Player, EntTable.Class, EntityClass) then
+        else
             -- Create sents using their spawn function with the arguments we stored earlier
             sent = true
 
@@ -609,6 +608,8 @@ local function CreateEntityFromTable(EntTable, Player)
                         sent = gamemode.Call("PlayerSpawnSWEP", Player, EntTable.Class, weapon)
                     else
                         sent = gamemode.Call("PlayerSpawnSENT", Player, EntTable.Class)
+                        --local ent = ents.Create(EntTable.Class)
+                        --sent = true
                     end
                 end
             else
@@ -629,9 +630,6 @@ local function CreateEntityFromTable(EntTable, Player)
             status, valid = xpcall(EntityClass.Func, ErrorNoHaltWithStack, Player, unpack(ArgList, 1, #EntityClass.Args))
 
             hook.Remove( "OnEntityCreated", "SrvDupe_GetLastEntitiesCreated" )
-        else
-            print("Advanced Duplicator 2: ENTITY CLASS IS BLACKLISTED, CLASS NAME: " .. EntTable.Class)
-            return nil
         end
     end
 
@@ -713,30 +711,23 @@ function SrvDupe.duplicator.Paste(Player, EntityList, ConstraintList, Position, 
         v.BuildDupeInfo.PhysicsObjects = table.Copy(v.PhysicsObjects)
         proppos = v.PhysicsObjects[0].Pos
         v.BuildDupeInfo.PhysicsObjects[0].Pos = Vector(0, 0, 0)
-        if (OrigPos) then
-            for i, p in pairs(v.BuildDupeInfo.PhysicsObjects) do
-                v.PhysicsObjects[i].Pos = p.Pos + proppos + OrigPos
-                v.PhysicsObjects[i].Frozen = true
-            end
-            v.Pos = v.PhysicsObjects[0].Pos
-            v.Angle = v.PhysicsObjects[0].Angle
-            v.BuildDupeInfo.PosReset = v.Pos
-            v.BuildDupeInfo.AngleReset = v.Angle
-        else
-            for i, p in pairs(v.BuildDupeInfo.PhysicsObjects) do
-                v.PhysicsObjects[i].Pos, v.PhysicsObjects[i].Angle =
-                LocalToWorld(p.Pos + proppos, p.Angle, Position, AngleOffset)
-                v.PhysicsObjects[i].Frozen = true
-            end
-            v.Pos = v.PhysicsObjects[0].Pos
-            v.BuildDupeInfo.PosReset = v.Pos
-            v.Angle = v.PhysicsObjects[0].Angle
-            v.BuildDupeInfo.AngleReset = v.Angle
+
+        -- removed if origPos (will never have origPos here)
+        for i, p in pairs(v.BuildDupeInfo.PhysicsObjects) do
+            v.PhysicsObjects[i].Pos, v.PhysicsObjects[i].Angle =
+            LocalToWorld(p.Pos + proppos, p.Angle, Position, AngleOffset)
+            v.PhysicsObjects[i].Frozen = true
         end
+        v.Pos = v.PhysicsObjects[0].Pos
+        v.BuildDupeInfo.PosReset = v.Pos
+        v.Angle = v.PhysicsObjects[0].Angle
+        v.BuildDupeInfo.AngleReset = v.Angle
 
         SrvDupe.SpawningEntity = true
+        SrvDupe.ApplyCustomRestrictions()
         local Ent = CreateEntityFromTable(v, Player)
         SrvDupe.SpawningEntity = false
+        SrvDupe.RevertCustomRestrictions()
 
         if Ent then
             if (Player) then Player:AddCleanup("SrvDupe", Ent) end
@@ -770,6 +761,7 @@ function SrvDupe.duplicator.Paste(Player, EntityList, ConstraintList, Position, 
         end
     end
 
+    --if false then
     if (Player) then
         local undotxt = "SrvDupe"..(Player.SrvDupe.Name and (": ("..tostring(Player.SrvDupe.Name)..")") or "")
 
@@ -820,16 +812,19 @@ function SrvDupe.duplicator.Paste(Player, EntityList, ConstraintList, Position, 
         end
     end
     DisablePropCreateEffect = nil
+
+    SrvDupe.ApplyCustomRestrictions()
     hook.Call("AdvDupe_FinishPasting", nil, {
         {
             EntityList = EntityList,
             CreatedEntities = CreatedEntities,
             ConstraintList = ConstraintList,
             CreatedConstraints = CreatedConstraints,
-            HitPos = OrigPos or Position,
+            HitPos = Position,
             Player = Player
         }
     }, 1)
+    SrvDupe.RevertCustomRestrictions()
 
     return CreatedEntities, CreatedConstraints
 end
@@ -980,8 +975,8 @@ local function SrvDupe_Spawn()
 
         if (Queue.Current > #Queue.ConstraintList) then
 
-            local unfreeze = tobool(Queue.Player:GetInfo("advdupe2_paste_unfreeze")) or false
-            local preservefrozenstate = tobool(Queue.Player:GetInfo("advdupe2_preserve_freeze")) or false
+            local unfreeze = tobool(Queue.Player:GetInfo("srvdupe_paste_unfreeze")) or true
+            local preservefrozenstate = tobool(Queue.Player:GetInfo("srvdupe_preserve_freeze")) or false
 
             -- Remove the undo for stopping pasting
             local undotxt = "SrvDupe"..(Queue.Name and (": ("..tostring(Queue.Name)..")") or "")
@@ -1070,6 +1065,7 @@ local function SrvDupe_Spawn()
             undo.SetPlayer(Queue.Player)
             undo.Finish()
 
+            SrvDupe.ApplyCustomRestrictions()
             hook.Call("AdvDupe_FinishPasting", nil, {
                 {
                     EntityList = Queue.EntityList,
@@ -1081,6 +1077,7 @@ local function SrvDupe_Spawn()
                 }
             }, 1)
             SrvDupe.FinishPasting(Queue.Player, true)
+            SrvDupe.RevertCustomRestrictions()
 
             table.remove(SrvDupe.JobManager.Queue, SrvDupe.JobManager.CurrentPlayer)
             if (#SrvDupe.JobManager.Queue == 0) then
@@ -1179,33 +1176,30 @@ local function RemoveSpawnedEntities(tbl, i)
     end
 end
 
-function SrvDupe.InitPastingQueue(Player, PositionOffset, AngleOffset, OrigPos, Constrs, Parenting, DisableParents, DisableProtection)
+function SrvDupe.InitPastingQueue(Player, PositionOffset, AngleOffset, OrigPos)
     local i = #SrvDupe.JobManager.Queue + 1
 
     local Queue = {
-        Player = Player,
+        Player = Player, --TODO: Remove Player
         SortedEntities = {},
         EntityList = table.Copy(Player.SrvDupe.Entities),
         Current = 1,
-        Name = Player.SrvDupe.Name,
+        Name = Player.SrvDupe.Name, -- TODO: Remove Player and give file name instead
         Entity = true,
         Constraint = false,
-        Parenting = Parenting,
-        DisableParents = DisableParents,
-        DisableProtection = DisableProtection,
+        Parenting = true,
+        DisableParents = false,
+        DisableProtection = true,
         CreatedEntities = {},
         CreatedConstraints = {},
         PositionOffset = PositionOffset or Vector(0, 0, 0),
         AngleOffset = AngleOffset or Angle(0, 0, 0),
-        Revision = Player.SrvDupe.Revision,
+        Revision = Player.SrvDupe.Revision, -- TODO: Remove Player and get Revision somehow (found in decode data)
     }
     SrvDupe.JobManager.Queue[i] = Queue
 
-    if (Constrs) then
-        Queue.ConstraintList = table.Copy(Player.SrvDupe.Constraints)
-    else
-        Queue.ConstraintList = {}
-    end
+    Queue.ConstraintList = table.Copy(Player.SrvDupe.Constraints)
+
     Queue.OrigPos = OrigPos
     for k, v in pairs(Player.SrvDupe.Entities) do
         table.insert(Queue.SortedEntities, k)
@@ -1237,7 +1231,7 @@ function SrvDupe.InitPastingQueue(Player, PositionOffset, AngleOffset, OrigPos, 
     undo.Finish()
 end
 
-function SrvDupe.LoadAndPaste(path, position, angle)
+function SrvDupe.LoadAndPaste(path, position, angle, plyRequestor)
     local fullPath = SrvDupe.DataFolder .. "/" .. path
     local content = file.Read(fullPath, "DATA")
     if not content then
@@ -1245,7 +1239,7 @@ function SrvDupe.LoadAndPaste(path, position, angle)
         return false
     end
 
-    local success, dupe, _, _ = SrvDupe.Decode(content)
+    local success, dupe, info, moreinfo = SrvDupe.Decode(content)
     if not success then
         print("[SrvDupe]\tFailed to decode file: " .. fullPath)
         return false
@@ -1253,6 +1247,10 @@ function SrvDupe.LoadAndPaste(path, position, angle)
 
     print("[SrvDupe]\t".. path .. " loaded successfully.")
 
-    -- TODO: ??
+    -- TODO: Use InitPastingQueue instead of .Paste
+    -- We should give everything to the func past {dupe, info, moreinfo} for maximum context without having to rely on ply
+    local Tab = {Entities=dupe["Entities"], Constraints=dupe["Constraints"], HeadEnt=dupe["HeadEnt"]}
+    SrvDupe.duplicator.Paste(plyRequestor, table.Copy(Tab.Entities), Tab.Constraints, Vector(0,0,0), Angle(0,0,0), nil, true)
+
     return true
 end
