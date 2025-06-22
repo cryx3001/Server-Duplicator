@@ -38,9 +38,24 @@ include("config/sh_config.lua")
 include("srvdupe/sh_codec.lua")
 include("srvdupe/sh_codec_legacy.lua")
 include("srvdupe/sh_file.lua")
+include("srvdupe/server/sv_clipboard.lua")
 include("srvdupe/server/sv_file.lua")
 include("srvdupe/server/sv_file_browser.lua")
 
+concommand.Add("srvdupe_spawn", function(ply, cmd, args)
+    if not SrvDupe.CheckPlyWritePermissions(ply) then
+        SrvDupe.Notify("Not enough permissions", 1, nil, ply, true)
+        return
+    end
+
+    local relativePath = args[1]
+    if not relativePath then
+        SrvDupe.Notify("No path specified", 1, nil, ply, false)
+        return
+    end
+
+    SrvDupe.LoadAndPaste(relativePath, nil, nil)
+end)
 
 util.AddNetworkString("SrvDupe_Notify")
 util.AddNetworkString("SrvDupe_AskServerDataContent")
