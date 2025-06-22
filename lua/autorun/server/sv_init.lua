@@ -103,3 +103,6 @@ util.AddNetworkString("SrvDupe_FileClientToServer")
 util.AddNetworkString("SrvDupe_FileServerToClient")
 util.AddNetworkString("SrvDupe_AskServerForFile")
 
+CreateConVar("SrvDupe_SpawnRate", "1", {FCVAR_ARCHIVE})
+CreateConVar("SrvDupe_Strict", "0", {FCVAR_ARCHIVE}, "Prevents entities from being duped with unauthorized data. Can fix certain exploits at the cost of some entities potentially duping incorrectly")
+

@@ -218,7 +218,7 @@ local function CreateConstraintFromTable(Constraint, EntityList, EntityTable, Pl
 
     if not ok or not Ent then
         if (Player) then
-            SrvDupe.Notify(Player, "ERROR, Failed to create " .. Constraint.Type .. " Constraint!", NOTIFY_ERROR)
+            SrvDupe.Notify("ERROR, Failed to create " .. Constraint.Type .. " Constraint!", 0, nil, Player)
         else
             print("DUPLICATOR: ERROR, Failed to create " .. Constraint.Type .. " Constraint!")
         end
@@ -692,6 +692,10 @@ local function CreateEntityFromTable(EntTable, Player)
     end
 end
 
+function SrvDupe.FinishPasting(Player, Paste)
+    if(Paste) then SrvDupe.Notify("Finished Pasting!", 0, nil, Player, false) end
+end
+
 --[[
 	Name: Paste
 	Desc: Override the default duplicator's paste function
@@ -831,11 +835,11 @@ end
 
 local function SrvDupe_Spawn()
 
-    local Queue = SrvDupe.JobManager.Queue[SrvDupe.JobManager.CurrentPlayer]
+    local Queue = SrvDupe.JobManager.Queue[SrvDupe.JobManager.CurrentPaste]
 
     if (not Queue or not IsValid(Queue.Player)) then
         if Queue then
-            table.remove(SrvDupe.JobManager.Queue, SrvDupe.JobManager.CurrentPlayer)
+            table.remove(SrvDupe.JobManager.Queue, SrvDupe.JobManager.CurrentPaste)
         end
 
         if (#SrvDupe.JobManager.Queue == 0) then
@@ -847,9 +851,6 @@ local function SrvDupe_Spawn()
     end
 
     if (Queue.Entity) then
-        if (Queue.Current == 1) then
-            Queue.Player.SrvDupe.Queued = false
-        end
         if (Queue.Current > #Queue.SortedEntities) then
             Queue.Entity = false
             Queue.Constraint = true
@@ -896,8 +897,10 @@ local function SrvDupe_Spawn()
         end
 
         SrvDupe.SpawningEntity = true
+        SrvDupe.ApplyCustomRestrictions()
         local Ent = CreateEntityFromTable(v, Queue.Player)
         SrvDupe.SpawningEntity = false
+        SrvDupe.RevertCustomRestrictions()
 
         if Ent then
             Queue.Player:AddCleanup("SrvDupe", Ent)
@@ -939,10 +942,10 @@ local function SrvDupe_Spawn()
             Queue.Current = 1
         end
 
-        if (#SrvDupe.JobManager.Queue >= SrvDupe.JobManager.CurrentPlayer + 1) then
-            SrvDupe.JobManager.CurrentPlayer = SrvDupe.JobManager.CurrentPlayer + 1
+        if (#SrvDupe.JobManager.Queue >= SrvDupe.JobManager.CurrentPaste + 1) then
+            SrvDupe.JobManager.CurrentPaste = SrvDupe.JobManager.CurrentPaste + 1
         else
-            SrvDupe.JobManager.CurrentPlayer = 1
+            SrvDupe.JobManager.CurrentPaste = 1
         end
     else
         if (#Queue.ConstraintList > 0) then
@@ -975,8 +978,11 @@ local function SrvDupe_Spawn()
 
         if (Queue.Current > #Queue.ConstraintList) then
 
-            local unfreeze = tobool(Queue.Player:GetInfo("srvdupe_paste_unfreeze")) or true
-            local preservefrozenstate = tobool(Queue.Player:GetInfo("srvdupe_preserve_freeze")) or false
+            --local unfreeze = tobool(Queue.Player:GetInfo("srvdupe_paste_unfreeze")) or false
+            --local preservefrozenstate = tobool(Queue.Player:GetInfo("srvdupe_preserve_freeze")) or false
+            -- TODO: Implement option (convar?)
+            local unfreeze = false
+            local preservefrozenstate = false
 
             -- Remove the undo for stopping pasting
             local undotxt = "SrvDupe"..(Queue.Name and (": ("..tostring(Queue.Name)..")") or "")
@@ -1079,17 +1085,17 @@ local function SrvDupe_Spawn()
             SrvDupe.FinishPasting(Queue.Player, true)
             SrvDupe.RevertCustomRestrictions()
 
-            table.remove(SrvDupe.JobManager.Queue, SrvDupe.JobManager.CurrentPlayer)
+            table.remove(SrvDupe.JobManager.Queue, SrvDupe.JobManager.CurrentPaste)
             if (#SrvDupe.JobManager.Queue == 0) then
                 hook.Remove("Tick", "SrvDupe_Spawning")
                 DisablePropCreateEffect = nil
                 SrvDupe.JobManager.PastingHook = false
             end
         end
-        if (#SrvDupe.JobManager.Queue >= SrvDupe.JobManager.CurrentPlayer + 1) then
-            SrvDupe.JobManager.CurrentPlayer = SrvDupe.JobManager.CurrentPlayer + 1
+        if (#SrvDupe.JobManager.Queue >= SrvDupe.JobManager.CurrentPaste + 1) then
+            SrvDupe.JobManager.CurrentPaste = SrvDupe.JobManager.CurrentPaste + 1
         else
-            SrvDupe.JobManager.CurrentPlayer = 1
+            SrvDupe.JobManager.CurrentPaste = 1
         end
     end
 end
@@ -1111,14 +1117,14 @@ local function ErrorCatchSpawning()
                 return
             end
 
-            local Queue = SrvDupe.JobManager.Queue[SrvDupe.JobManager.CurrentPlayer]
+            local Queue = SrvDupe.JobManager.Queue[SrvDupe.JobManager.CurrentPaste]
             if (not Queue) then
                 print("[SrvDupeNotify]\t" .. err)
                 return
             end
 
             if (IsValid(Queue.Player)) then
-                SrvDupe.Notify(Queue.Player, err)
+                SrvDupe.Notify(err, 1, nil, Queue.Player)
 
                 local undos = undo.GetTable()[Queue.Player:UniqueID()]
                 local undotxt = Queue.Name and ("SrvDupe ("..Queue.Name..")") or "SrvDupe"
@@ -1144,15 +1150,15 @@ local function ErrorCatchSpawning()
                 SrvDupe.FinishPasting(Queue.Player, true)
             end
 
-            table.remove(SrvDupe.JobManager.Queue, SrvDupe.JobManager.CurrentPlayer)
+            table.remove(SrvDupe.JobManager.Queue, SrvDupe.JobManager.CurrentPaste)
 
             if (#SrvDupe.JobManager.Queue == 0) then
                 hook.Remove("Tick", "SrvDupe_Spawning")
                 DisablePropCreateEffect = nil
                 SrvDupe.JobManager.PastingHook = false
             else
-                if (#Queue < SrvDupe.JobManager.CurrentPlayer) then
-                    SrvDupe.JobManager.CurrentPlayer = 1
+                if (#Queue < SrvDupe.JobManager.CurrentPaste) then
+                    SrvDupe.JobManager.CurrentPaste = 1
                 end
             end
 
@@ -1176,15 +1182,16 @@ local function RemoveSpawnedEntities(tbl, i)
     end
 end
 
-function SrvDupe.InitPastingQueue(Player, PositionOffset, AngleOffset, OrigPos)
+function SrvDupe.InitPastingQueue(Player, PositionOffset, AngleOffset, Entities, Constraints, NameDupe, RevisionDupe)
     local i = #SrvDupe.JobManager.Queue + 1
 
     local Queue = {
-        Player = Player, --TODO: Remove Player
+        Player = Player,
         SortedEntities = {},
-        EntityList = table.Copy(Player.SrvDupe.Entities),
+        ConstraintList = Constraints,
+        EntityList = table.Copy(Entities),
         Current = 1,
-        Name = Player.SrvDupe.Name, -- TODO: Remove Player and give file name instead
+        Name = NameDupe or "",
         Entity = true,
         Constraint = false,
         Parenting = true,
@@ -1194,37 +1201,31 @@ function SrvDupe.InitPastingQueue(Player, PositionOffset, AngleOffset, OrigPos)
         CreatedConstraints = {},
         PositionOffset = PositionOffset or Vector(0, 0, 0),
         AngleOffset = AngleOffset or Angle(0, 0, 0),
-        Revision = Player.SrvDupe.Revision, -- TODO: Remove Player and get Revision somehow (found in decode data)
+        Revision = RevisionDupe,
     }
     SrvDupe.JobManager.Queue[i] = Queue
 
-    Queue.ConstraintList = table.Copy(Player.SrvDupe.Constraints)
-
-    Queue.OrigPos = OrigPos
-    for k, v in pairs(Player.SrvDupe.Entities) do
+    for k, v in pairs(Entities) do
         table.insert(Queue.SortedEntities, k)
     end
 
-    if (Player.SrvDupe.Name) then
+    if (NameDupe) then
         print(
-                "[SrvDupeNotifyPaste]\t Player: " .. Player:Nick() .. " Pasted File, " .. Player.SrvDupe.Name .. " with, " ..
-                        #Queue.SortedEntities .. " Entities and " .. #Player.SrvDupe.Constraints .. " Constraints.")
+                "[SrvDupeNotifyPaste]\t Player: " .. Player:Nick() .. " Pasted File, " .. NameDupe .. " with, " ..
+                        #Queue.SortedEntities .. " Entities and " .. #Queue.ConstraintList .. " Constraints.")
     else
         print("[SrvDupeNotifyPaste]\t Player: " .. Player:Nick() .. " Pasted, " .. #Queue.SortedEntities ..
-                " Entities and " .. #Player.SrvDupe.Constraints .. " Constraints.")
+                " Entities and " .. #Queue.ConstraintList .. " Constraints.")
     end
 
-    Queue.Plus = #Queue.SortedEntities
-    Queue.Percent = 1 / (#Queue.SortedEntities + #Queue.ConstraintList)
-    Player.SrvDupe.Queued = true
     if (not SrvDupe.JobManager.PastingHook) then
         DisablePropCreateEffect = true
         hook.Add("Tick", "SrvDupe_Spawning", ErrorCatchSpawning)
         SrvDupe.JobManager.PastingHook = true
-        SrvDupe.JobManager.CurrentPlayer = 1
+        SrvDupe.JobManager.CurrentPaste = 1
     end
 
-    local undotxt = "SrvDupe"..(Player.SrvDupe.Name and (": ("..tostring(Player.SrvDupe.Name)..")") or "")
+    local undotxt = "SrvDupe"..(NameDupe and (": ("..tostring(NameDupe)..")") or "")
     undo.Create(undotxt)
     undo.SetPlayer(Player)
     undo.AddFunction(RemoveSpawnedEntities, i)
@@ -1247,10 +1248,12 @@ function SrvDupe.LoadAndPaste(path, position, angle, plyRequestor)
 
     print("[SrvDupe]\t".. path .. " loaded successfully.")
 
-    -- TODO: Use InitPastingQueue instead of .Paste
-    -- We should give everything to the func past {dupe, info, moreinfo} for maximum context without having to rely on ply
+    local pathSplits = string.Split(path, "/")
+    local nameDupe = string.StripExtension(pathSplits[#pathSplits])
+    local revDupe = info["revision"]
+
     local Tab = {Entities=dupe["Entities"], Constraints=dupe["Constraints"], HeadEnt=dupe["HeadEnt"]}
-    SrvDupe.duplicator.Paste(plyRequestor, table.Copy(Tab.Entities), Tab.Constraints, Vector(0,0,0), Angle(0,0,0), nil, true)
+    SrvDupe.InitPastingQueue(plyRequestor, Vector(0,0,0), Angle(0,0,0), Tab.Entities, Tab.Constraints, nameDupe, revDupe)
 
     return true
 end
