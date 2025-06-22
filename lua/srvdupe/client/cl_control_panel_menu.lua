@@ -1,6 +1,5 @@
 local function isAllowed()
     local roles = SrvDupe.Config.AllowedRolesWrite or {}
-    PrintTable(roles)
     return table.HasValue(roles, LocalPlayer():GetUserGroup())
 end
 

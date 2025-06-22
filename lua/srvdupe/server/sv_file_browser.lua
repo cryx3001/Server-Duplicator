@@ -20,7 +20,7 @@ end
 
 net.Receive("SrvDupe_AskServerDataContent", function(_, ply)
     if not SrvDupe.CheckPlyWritePermissions(ply) then
-        SrvDupe.Notify(ply, "Not enough permission", 1, true)
+        SrvDupe.Notify("Not enough permissions", 1, nil, ply, true)
         return
     end
 

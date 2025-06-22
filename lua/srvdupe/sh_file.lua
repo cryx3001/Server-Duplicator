@@ -1,4 +1,4 @@
-function SrvDupe.SaveFile(fileName, content)
+function SrvDupe.SaveFile(fileName, content, plyRequest)
     local dataFolder
     if SERVER then
         dataFolder = SrvDupe.DataFolder
@@ -20,18 +20,28 @@ function SrvDupe.SaveFile(fileName, content)
     end
     fileName = tmpFileName .. "." .. extensionFile
 
+    local success, _, _, _ = SrvDupe.Decode(content)
+
+    if not success then
+        SrvDupe.Notify("Failed to decode file content of " .. fileName .. ", not saving" , 1, nil, plyRequest, true)
+        return false
+    else
+        SrvDupe.Notify("File " .. fileName .. " saved successfully", 0, nil, plyRequest)
+    end
+
     file.Append(dataFolder .. "/" .. fileName, content)
 
     if SERVER then
         net.Start("SrvDupe_BroadcastChange")
         net.Broadcast()
     end
+    return true
 end
 
 function SrvDupe.SendFile(fileName, content, ply)
     if SERVER then
         if not SrvDupe.CheckPlyWritePermissions(ply) then
-            SrvDupe.Notify(ply, "Not enough permissions", 1, true)
+            SrvDupe.Notify("Not enough permissions", 1, nil, ply, true)
             return
         end
     end
@@ -56,7 +66,7 @@ end
 function SrvDupe.HandleFileStream(_, ply)
     if SERVER then
         if not SrvDupe.CheckPlyWritePermissions(ply) then
-            SrvDupe.Notify(ply, "Not enough permission", 1, true)
+            SrvDupe.Notify("Not enough permissions", 1, nil, ply, true)
             return
         end
     end
@@ -67,6 +77,6 @@ function SrvDupe.HandleFileStream(_, ply)
 
     local fileName = net.ReadString()
     net.ReadStream(ply, function(data)
-        SrvDupe.SaveFile(fileName, data)
+        SrvDupe.SaveFile(fileName, data, ply)
     end)
 end

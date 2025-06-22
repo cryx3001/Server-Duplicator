@@ -5,10 +5,12 @@ SrvDupe = {
 print("[SrvDupe]\tHello World!")
 
 include("config/sh_config.lua")
+include("srvdupe/sh_codec.lua")
+include("srvdupe/sh_codec_legacy.lua")
 include("srvdupe/sh_file.lua")
 include("srvdupe/client/cl_file_browser.lua")
-include("srvdupe/client/cl_control_panel_menu.lua")
 include("srvdupe/client/cl_file.lua")
+include("srvdupe/client/cl_control_panel_menu.lua")
 
 function SrvDupe.Notify(msg,typ,dur)
     surface.PlaySound(typ == 1 and "buttons/button10.wav" or "ambient/water/drip1.wav")

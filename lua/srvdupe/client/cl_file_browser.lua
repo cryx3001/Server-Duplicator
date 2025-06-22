@@ -229,7 +229,7 @@ function addOptionsFileClientside(Menu, node)
 
         local fileExists = file.Exists(fullPath, "DATA")
         if not fileExists then
-            SrvDupe.Notify(ply, "File does not exists anymore!", 1, true)
+            SrvDupe.Notify("File does not exists anymore!", 1, nil, ply, true)
             return
         end
 
@@ -774,6 +774,7 @@ local function PanelSetSize(self, x, y)
 end
 
 local function UpdateClientFiles()
+    if not SrvDupe.FileBrowser or not SrvDupe.FileBrowser.Browser then return end
 
     local pnlCanvas = SrvDupe.FileBrowser.Browser.pnlCanvas
 
@@ -1071,5 +1072,9 @@ if (game.SinglePlayer()) then
         end
     end)
 end
+
+net.Receive("SrvDupe_BroadcastChange", function()
+    UpdateClientFiles()
+end)
 
 vgui.Register("srvdupe_browser", PANEL, "Panel")

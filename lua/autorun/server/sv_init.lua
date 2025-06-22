@@ -8,7 +8,7 @@ if not file.Exists(SrvDupe.DataFolder, "DATA") then
     file.CreateDir(SrvDupe.DataFolder)
 end
 
-function SrvDupe.Notify(ply,msg,typ, showsrv, dur)
+function SrvDupe.Notify(msg, typ, dur, ply, showsrv)
     net.Start("SrvDupe_Notify")
     net.WriteString(msg)
     net.WriteUInt(typ or 0, 8)
@@ -26,16 +26,20 @@ function SrvDupe.CheckPlyWritePermissions(ply)
 end
 
 AddCSLuaFile("config/sh_config.lua")
+AddCSLuaFile("srvdupe/sh_codec.lua")
+AddCSLuaFile("srvdupe/sh_codec_legacy.lua")
 AddCSLuaFile("srvdupe/sh_file.lua")
 AddCSLuaFile("srvdupe/client/cl_control_panel_menu.lua")
-AddCSLuaFile("srvdupe/client/cl_file_browser.lua")
 AddCSLuaFile("srvdupe/client/cl_file.lua")
+AddCSLuaFile("srvdupe/client/cl_file_browser.lua")
 
 
 include("config/sh_config.lua")
+include("srvdupe/sh_codec.lua")
+include("srvdupe/sh_codec_legacy.lua")
 include("srvdupe/sh_file.lua")
-include("srvdupe/server/sv_file_browser.lua")
 include("srvdupe/server/sv_file.lua")
+include("srvdupe/server/sv_file_browser.lua")
 
 
 util.AddNetworkString("SrvDupe_Notify")

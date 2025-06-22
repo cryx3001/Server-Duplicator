@@ -3,7 +3,7 @@ net.Receive("SrvDupe_FileClientToServer", SrvDupe.HandleFileStream)
 net.Receive("SrvDupe_AskServerForFile", function(_, ply)
     if SERVER then
         if not SrvDupe.CheckPlyWritePermissions(ply) then
-            SrvDupe.Notify(ply, "Not enough permissions", 1, true)
+            SrvDupe.Notify("Not enough permissions", 1, nil, ply, true)
             return
         end
     end
@@ -13,7 +13,7 @@ net.Receive("SrvDupe_AskServerForFile", function(_, ply)
 
     local fileExists = file.Exists(fullPath, "DATA")
     if not fileExists then
-        SrvDupe.Notify(ply, "File does not exists anymore!", 1, true)
+        SrvDupe.Notify("File does not exists anymore!", 1, nil, ply, true)
         return
     end
 
