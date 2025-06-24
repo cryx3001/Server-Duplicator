@@ -4,10 +4,11 @@ SrvDupe = {
 
 print("[SrvDupe]\tHello World!")
 
-include("config/sh_config.lua")
+include("config/sh_srvdupe_config.lua")
 include("srvdupe/sh_codec.lua")
 include("srvdupe/sh_codec_legacy.lua")
 include("srvdupe/sh_file.lua")
+
 include("srvdupe/client/cl_file_browser.lua")
 include("srvdupe/client/cl_file.lua")
 include("srvdupe/client/cl_control_panel_menu.lua")
@@ -20,3 +21,5 @@ end
 net.Receive("SrvDupe_Notify", function()
     SrvDupe.Notify(net.ReadString(), net.ReadUInt(8), net.ReadFloat())
 end)
+
+hook.Run("SrvDupe_PostInit")

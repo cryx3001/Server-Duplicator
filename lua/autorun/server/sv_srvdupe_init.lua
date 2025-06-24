@@ -11,6 +11,27 @@ if not file.Exists(SrvDupe.DataFolder, "DATA") then
     file.CreateDir(SrvDupe.DataFolder)
 end
 
+AddCSLuaFile("config/sh_srvdupe_config.lua")
+AddCSLuaFile("srvdupe/sh_codec.lua")
+AddCSLuaFile("srvdupe/sh_codec_legacy.lua")
+AddCSLuaFile("srvdupe/sh_file.lua")
+AddCSLuaFile("srvdupe/sh_srvdupe.lua")
+
+AddCSLuaFile("srvdupe/client/cl_control_panel_menu.lua")
+AddCSLuaFile("srvdupe/client/cl_file.lua")
+AddCSLuaFile("srvdupe/client/cl_file_browser.lua")
+
+
+include("config/sh_srvdupe_config.lua")
+include("srvdupe/sh_codec.lua")
+include("srvdupe/sh_codec_legacy.lua")
+include("srvdupe/sh_file.lua")
+include("srvdupe/sh_srvdupe.lua")
+
+include("srvdupe/server/sv_clipboard.lua")
+include("srvdupe/server/sv_file.lua")
+include("srvdupe/server/sv_file_browser.lua")
+
 function SrvDupe.Notify(msg, typ, dur, ply, showsrv)
     net.Start("SrvDupe_Notify")
     net.WriteString(msg)
@@ -21,11 +42,6 @@ function SrvDupe.Notify(msg, typ, dur, ply, showsrv)
     if(showsrv==true)then
         print("[SrvDupe]\t"..ply:Nick()..": "..msg)
     end
-end
-
-function SrvDupe.CheckPlyWritePermissions(ply)
-    local roles = SrvDupe.Config.AllowedRolesWrite or {}
-    return table.HasValue(roles, ply:GetUserGroup())
 end
 
 function SrvDupe.ApplyCustomRestrictions()
@@ -62,24 +78,6 @@ hook.Add("PlayerInitialSpawn","SrvDupe_AddPlayerTable",function(ply)
     ply.SrvDupe = {}
 end)
 
-AddCSLuaFile("config/sh_config.lua")
-AddCSLuaFile("srvdupe/sh_codec.lua")
-AddCSLuaFile("srvdupe/sh_codec_legacy.lua")
-AddCSLuaFile("srvdupe/sh_file.lua")
-AddCSLuaFile("srvdupe/client/cl_control_panel_menu.lua")
-AddCSLuaFile("srvdupe/client/cl_file.lua")
-AddCSLuaFile("srvdupe/client/cl_file_browser.lua")
-
-
-include("config/sh_config.lua")
-include("srvdupe/sh_codec.lua")
-include("srvdupe/sh_codec_legacy.lua")
-include("srvdupe/sh_file.lua")
-
-include("srvdupe/server/sv_clipboard.lua")
-include("srvdupe/server/sv_file.lua")
-include("srvdupe/server/sv_file_browser.lua")
-
 concommand.Add("srvdupe_spawn", function(ply, cmd, args)
     if not SrvDupe.CheckPlyWritePermissions(ply) then
         SrvDupe.Notify("Not enough permissions", 1, nil, ply, true)
@@ -105,4 +103,6 @@ util.AddNetworkString("SrvDupe_AskServerForFile")
 
 CreateConVar("SrvDupe_SpawnRate", "1", {FCVAR_ARCHIVE})
 CreateConVar("SrvDupe_Strict", "0", {FCVAR_ARCHIVE}, "Prevents entities from being duped with unauthorized data. Can fix certain exploits at the cost of some entities potentially duping incorrectly")
+
+hook.Run("SrvDupe_PostInit")
 

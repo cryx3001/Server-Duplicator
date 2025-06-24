@@ -229,7 +229,7 @@ function addOptionsFileClientside(Menu, node)
 
         local fileExists = file.Exists(fullPath, "DATA")
         if not fileExists then
-            SrvDupe.Notify("File does not exists anymore!", 1, nil, ply, true)
+            SrvDupe.Notify("File does not exists anymore!", 1, nil)
             return
         end
 
@@ -250,6 +250,12 @@ function addOptionsFileServerside(Menu, node)
 
     Menu:AddOption("Delete", function()
 
+    end)
+
+    Menu:AddOption("Copy path to clipboard", function()
+        local path, _ = GetNodePath(node)
+        SetClipboardText(path)
+        SrvDupe.Notify("Copied to clipboard!", 0, nil)
     end)
 
     Menu:AddSpacer()
