@@ -394,7 +394,7 @@ local function GenericDuplicatorFunction(data, Player)
         if (Player) then
             reportclass(Player, data.Class)
         else
-            print("Advanced Duplicator 2 Invalid Class: " .. data.Class)
+            print("ServerDupe Invalid Class: " .. data.Class)
         end
         return nil
     end
@@ -403,7 +403,7 @@ local function GenericDuplicatorFunction(data, Player)
         if (Player) then
             reportmodel(Player, data.Model)
         else
-            print("Advanced Duplicator 2 Invalid Model: " .. data.Model)
+            print("ServerDupe Invalid Model: " .. data.Model)
         end
         return nil
     end
@@ -434,7 +434,7 @@ local function MakeProp(Player, Pos, Ang, Model, PhysicsObject, Data)
         if (Player) then
             reportmodel(Player, Data.Model)
         else
-            print("Advanced Duplicator 2 Invalid Model: " .. Model)
+            print("ServerDupe Invalid Model: " .. Model)
         end
         return nil
     end
@@ -471,54 +471,10 @@ local function RestoreBodyGroups(ent, BodyG)
     end
 end
 
---[[
-	Name: CreateEntityFromTable
-	Desc: Creates an entity from a given table
-	Params: <table> EntTable, <player> Player
-	Returns: nil
-]]
-local function IsAllowed(Player, Class, EntityClass)
-    return true
-    --if (scripted_ents.GetMember(Class, "DoNotDuplicate")) then return false end
-    --
-    --if (IsValid(Player) and not Player:IsAdmin()) then
-    --    if not duplicator.IsAllowed(Class) then return false end
-    --
-    --    local weapon = list.GetForEdit("Weapon")[Class]
-    --
-    --    if weapon then
-    --        if (not weapon.Spawnable) then return false end
-    --        if (weapon.AdminOnly) then return false end
-    --    else
-    --        if (not scripted_ents.GetMember(Class, "Spawnable") and not EntityClass) then return false end
-    --        if (scripted_ents.GetMember(Class, "AdminOnly")) then return false end
-    --    end
-    --end
-    --
-    --return true
-end
-
 local function CreateEntityFromTable(EntTable, Player)
     hook.Run("AdvDupe_PreCreateEntity", EntTable, Player)
 
     local EntityClass = duplicator.FindEntityClass(EntTable.Class)
-
-    --if not IsAllowed(Player, EntTable.Class, EntityClass) then
-    --    Player:ChatPrint([[Entity Class Black listed, "]] .. EntTable.Class .. [["]])
-    --    return nil
-    --end
-    --
-    --local canCreate, blockReason = hook.Run( "SrvDupe_CanCreateEntity", Player, EntTable.Class )
-    --if canCreate == false then
-    --    local msg = [[Entity Class, "]] .. EntTable.Class .. [[" is Blocked! ]]
-    --    if isstring( blockReason ) then -- allow nil blockReason
-    --        msg = msg .. blockReason
-    --
-    --    end
-    --    Player:ChatPrint( msg )
-    --    return nil
-    --end
-
     local sent = false
     local status, valid
     local GENERIC = false
@@ -547,7 +503,7 @@ local function CreateEntityFromTable(EntTable, Player)
         end
 
         if (sent == false) then
-            print("Advanced Duplicator 2: Creation rejected for class, : " .. EntTable.Class)
+            print("ServerDupe: Creation rejected for class, : " .. EntTable.Class)
             return nil
         else
             sent = true
@@ -558,7 +514,7 @@ local function CreateEntityFromTable(EntTable, Player)
         --if IsAllowed(Player, EntTable.Class, EntityClass) then
         --    status, valid = pcall(GenericDuplicatorFunction, EntTable, Player)
         --else
-        --    print("Advanced Duplicator 2: ENTITY CLASS IS BLACKLISTED, CLASS NAME: " .. EntTable.Class)
+        --    print("ServerDupe: ENTITY CLASS IS BLACKLISTED, CLASS NAME: " .. EntTable.Class)
         --    return nil
         --end
     end
@@ -617,7 +573,7 @@ local function CreateEntityFromTable(EntTable, Player)
             end
 
             if (sent == false) then
-                print("Advanced Duplicator 2: Creation rejected for class, : " .. EntTable.Class)
+                print("ServerDupe: Creation rejected for class, : " .. EntTable.Class)
                 return nil
             else
                 sent = true
@@ -678,7 +634,7 @@ local function CreateEntityFromTable(EntTable, Player)
         return valid
     else
         if (status == false) then
-            print("Advanced Duplicator 2: Error creating entity, removing last created entities")
+            print("ServerDupe: Error creating entity, removing last created entities")
             for _, CreatedEntity in pairs(CreatedEntities) do
                 SafeRemoveEntity(CreatedEntity)
             end
@@ -775,7 +731,7 @@ function SrvDupe.duplicator.Paste(Player, EntityList, ConstraintList, Position, 
             if v.PostEntityPaste then
                 local status, valid = pcall(v.PostEntityPaste, v, Player, v, CreatedEntities)
                 if (not status) then
-                    print("AD2 PostEntityPaste Error: " .. tostring(valid))
+                    print("ServerDupe PostEntityPaste Error: " .. tostring(valid))
                 end
             end
 
@@ -800,7 +756,7 @@ function SrvDupe.duplicator.Paste(Player, EntityList, ConstraintList, Position, 
             if v.PostEntityPaste then
                 local status, valid = pcall(v.PostEntityPaste, v, Player, v, CreatedEntities)
                 if (not status) then
-                    print("AD2 PostEntityPaste Error: " .. tostring(valid))
+                    print("ServerDupe PostEntityPaste Error: " .. tostring(valid))
                 end
             end
 
@@ -825,7 +781,8 @@ function SrvDupe.duplicator.Paste(Player, EntityList, ConstraintList, Position, 
             ConstraintList = ConstraintList,
             CreatedConstraints = CreatedConstraints,
             HitPos = Position,
-            Player = Player
+            Player = Player,
+            IsServerDupe = true
         }
     }, 1)
     SrvDupe.RevertCustomRestrictions()
@@ -932,7 +889,7 @@ local function SrvDupe_Spawn()
                 if Ent.PostEntityPaste then
                     local status, valid = pcall(Ent.PostEntityPaste, Ent, Queue.Player, Ent, Queue.CreatedEntities)
                     if (not status) then
-                        print("AD2 PostEntityPaste Error: " .. tostring(valid))
+                        print("ServerDupe PostEntityPaste Error: " .. tostring(valid))
                     end
                 end
             end
@@ -1079,7 +1036,8 @@ local function SrvDupe_Spawn()
                     ConstraintList = Queue.ConstraintList,
                     CreatedConstraints = Queue.CreatedConstraints,
                     HitPos = Queue.PositionOffset,
-                    Player = Queue.Player
+                    Player = Queue.Player,
+                    IsServerDupe = true
                 }
             }, 1)
             SrvDupe.FinishPasting(Queue.Player, true)
@@ -1232,7 +1190,12 @@ function SrvDupe.InitPastingQueue(Player, PositionOffset, AngleOffset, Entities,
     undo.Finish()
 end
 
-function SrvDupe.LoadAndPaste(path, position, angle, plyRequestor)
+local function GetDupeElevation(dupe)
+    local enz = (tonumber(dupe.HeadEnt.Z) or 0)
+    return math.Clamp(enz, -32000, 32000)
+end
+
+function SrvDupe.LoadFile(path)
     local fullPath = SrvDupe.DataFolder .. "/" .. path
     local content = file.Read(fullPath, "DATA")
     if not content then
@@ -1246,6 +1209,16 @@ function SrvDupe.LoadAndPaste(path, position, angle, plyRequestor)
         return false
     end
 
+    return success, dupe, info, moreinfo
+end
+
+function SrvDupe.LoadAndPaste(path, position, angle, plyRequestor)
+    local success, dupe, info, moreinfo = SrvDupe.LoadFile(path)
+
+    if not success then
+        return false
+    end
+
     print("[SrvDupe]\t".. path .. " loaded successfully.")
 
     local pathSplits = string.Split(path, "/")
@@ -1253,7 +1226,7 @@ function SrvDupe.LoadAndPaste(path, position, angle, plyRequestor)
     local revDupe = info["revision"]
 
     local Tab = {Entities=dupe["Entities"], Constraints=dupe["Constraints"], HeadEnt=dupe["HeadEnt"]}
-    SrvDupe.InitPastingQueue(plyRequestor, Vector(0,0,0), Angle(0,0,0), Tab.Entities, Tab.Constraints, nameDupe, revDupe)
+    SrvDupe.InitPastingQueue(plyRequestor, position + Vector(0,0, GetDupeElevation(dupe)) , angle, Tab.Entities, Tab.Constraints, nameDupe, revDupe)
 
     return true
 end

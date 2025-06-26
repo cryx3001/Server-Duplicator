@@ -15,7 +15,8 @@ include("srvdupe/client/cl_control_panel_menu.lua")
 
 function SrvDupe.Notify(msg,typ,dur)
     surface.PlaySound(typ == 1 and "buttons/button10.wav" or "ambient/water/drip1.wav")
-    GAMEMODE:AddNotify(msg, typ or NOTIFY_GENERIC, dur or 5) if not game.SinglePlayer() then print("[SrvDupe]\t"..msg) end
+    GAMEMODE:AddNotify(msg, typ or NOTIFY_GENERIC, dur or 5)
+    if not game.SinglePlayer() then print("[SrvDupe]\t"..msg) end
 end
 
 net.Receive("SrvDupe_Notify", function()

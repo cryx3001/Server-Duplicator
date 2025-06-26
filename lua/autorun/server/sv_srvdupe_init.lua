@@ -56,7 +56,6 @@ function SrvDupe.ApplyCustomRestrictions()
     ENT.CheckLimit = function(ply, ent) return true end
     ENT.CheckRestriction = function(ply, ent) return true end
     ENT.AddCount = function (str, ent) return end
-    --print("SrvDupe.ApplyCustomRestrictions()")
 end
 
 function SrvDupe.RevertCustomRestrictions()
@@ -71,27 +70,26 @@ function SrvDupe.RevertCustomRestrictions()
     SrvDupe.old_CheckLimit = nil
     SrvDupe.old_CheckRestriction = nil
     SrvDupe.old_AddCount = nil
-    --print("SrvDupe.RevertCustomRestrictions()")
 end
 
 hook.Add("PlayerInitialSpawn","SrvDupe_AddPlayerTable",function(ply)
     ply.SrvDupe = {}
 end)
 
-concommand.Add("srvdupe_spawn", function(ply, cmd, args)
-    if not SrvDupe.CheckPlyWritePermissions(ply) then
-        SrvDupe.Notify("Not enough permissions", 1, nil, ply, true)
-        return
-    end
-
-    local relativePath = args[1]
-    if not relativePath then
-        SrvDupe.Notify("No path specified", 1, nil, ply, false)
-        return
-    end
-
-    SrvDupe.LoadAndPaste(relativePath, nil, nil, ply)
-end)
+--concommand.Add("srvdupe_spawn", function(ply, cmd, args)
+--    if not SrvDupe.CheckPlyWritePermissions(ply) then
+--        SrvDupe.Notify("Not enough permissions", 1, nil, ply, true)
+--        return
+--    end
+--
+--    local relativePath = args[1]
+--    if not relativePath then
+--        SrvDupe.Notify("No path specified", 1, nil, ply, false)
+--        return
+--    end
+--
+--    SrvDupe.LoadAndPaste(relativePath, nil, nil, ply)
+--end)
 
 util.AddNetworkString("SrvDupe_Notify")
 util.AddNetworkString("SrvDupe_AskServerDataContent")
