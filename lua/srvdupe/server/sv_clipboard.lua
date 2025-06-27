@@ -658,7 +658,7 @@ end
 	Params: <player> Player, <table> Entities, <table> Constraints
 	Returns: <table> Entities, <table> Constraints
 ]]
-function SrvDupe.duplicator.Paste(Player, EntityList, ConstraintList, Position, AngleOffset, OrigPos, Parenting)
+function SrvDupe.duplicator.Paste(Player, EntityList, ConstraintList, Position, AngleOffset, OrigPos, Parenting, onUndoCallback)
 
     local CreatedEntities = {}
     --
@@ -723,7 +723,7 @@ function SrvDupe.duplicator.Paste(Player, EntityList, ConstraintList, Position, 
 
     --if false then
     if (Player) then
-        local undotxt = "SrvDupe"..(Player.SrvDupe.Name and (": ("..tostring(Player.SrvDupe.Name)..")") or "")
+        local undotxt = "SrvDupe"..(Player.SrvDupe.Name and (" ("..tostring(Player.SrvDupe.Name)..")") or "")
 
         undo.Create(undotxt)
         for _, v in pairs(CreatedEntities) do
@@ -746,6 +746,9 @@ function SrvDupe.duplicator.Paste(Player, EntityList, ConstraintList, Position, 
             undo.AddEntity(v)
         end
         undo.SetPlayer(Player)
+        if (onUndoCallback) then
+            undo.AddFunction(onUndoCallback)
+        end
         undo.Finish()
 
         -- if(Tool)then SrvDupe.FinishPasting(Player, true) end
@@ -942,7 +945,7 @@ local function SrvDupe_Spawn()
             local preservefrozenstate = false
 
             -- Remove the undo for stopping pasting
-            local undotxt = "SrvDupe"..(Queue.Name and (": ("..tostring(Queue.Name)..")") or "")
+            local undotxt = "SrvDupe"..(Queue.Name and (" ("..tostring(Queue.Name)..")") or "")
             local undos = undo.GetTable()[Queue.Player:UniqueID()]
             for i = #undos, 1, -1 do
                 if (undos[i] and undos[i].Name == undotxt) then
@@ -1026,6 +1029,9 @@ local function SrvDupe_Spawn()
                 end
             end
             undo.SetPlayer(Queue.Player)
+            if (Queue.onUndoCallback) then
+                undo.AddFunction(Queue.onUndoCallback)
+            end
             undo.Finish()
 
             SrvDupe.ApplyCustomRestrictions()
@@ -1140,7 +1146,7 @@ local function RemoveSpawnedEntities(tbl, i)
     end
 end
 
-function SrvDupe.InitPastingQueue(Player, PositionOffset, AngleOffset, Entities, Constraints, NameDupe, RevisionDupe)
+function SrvDupe.InitPastingQueue(Player, PositionOffset, AngleOffset, Entities, Constraints, NameDupe, RevisionDupe, onUndoCallback)
     local i = #SrvDupe.JobManager.Queue + 1
 
     local Queue = {
@@ -1160,6 +1166,7 @@ function SrvDupe.InitPastingQueue(Player, PositionOffset, AngleOffset, Entities,
         PositionOffset = PositionOffset or Vector(0, 0, 0),
         AngleOffset = AngleOffset or Angle(0, 0, 0),
         Revision = RevisionDupe,
+        onUndoCallback = onUndoCallback,
     }
     SrvDupe.JobManager.Queue[i] = Queue
 
@@ -1183,10 +1190,13 @@ function SrvDupe.InitPastingQueue(Player, PositionOffset, AngleOffset, Entities,
         SrvDupe.JobManager.CurrentPaste = 1
     end
 
-    local undotxt = "SrvDupe"..(NameDupe and (": ("..tostring(NameDupe)..")") or "")
+    local undotxt = "SrvDupe"..(NameDupe and (" ("..tostring(NameDupe)..")") or "")
     undo.Create(undotxt)
     undo.SetPlayer(Player)
     undo.AddFunction(RemoveSpawnedEntities, i)
+    if (onUndoCallback) then
+        undo.AddFunction(onUndoCallback)
+    end
     undo.Finish()
 end
 
@@ -1212,7 +1222,7 @@ function SrvDupe.LoadFile(path)
     return success, dupe, info, moreinfo
 end
 
-function SrvDupe.LoadAndPaste(path, position, angle, plyRequestor)
+function SrvDupe.LoadAndPaste(path, position, angle, plyRequestor, onUndoCallback)
     local success, dupe, info, moreinfo = SrvDupe.LoadFile(path)
 
     if not success then
@@ -1226,7 +1236,7 @@ function SrvDupe.LoadAndPaste(path, position, angle, plyRequestor)
     local revDupe = info["revision"]
 
     local Tab = {Entities=dupe["Entities"], Constraints=dupe["Constraints"], HeadEnt=dupe["HeadEnt"]}
-    SrvDupe.InitPastingQueue(plyRequestor, position + Vector(0,0, GetDupeElevation(dupe)) , angle, Tab.Entities, Tab.Constraints, nameDupe, revDupe)
+    SrvDupe.InitPastingQueue(plyRequestor, position + Vector(0,0, GetDupeElevation(dupe)) , angle, Tab.Entities, Tab.Constraints, nameDupe, revDupe, onUndoCallback)
 
     return true
 end
