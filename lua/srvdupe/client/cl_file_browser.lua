@@ -108,7 +108,7 @@ function BROWSERPNL:OnVScroll(iOffset)
     self.pnlCanvas:SetPos(0, iOffset)
 end
 
-derma.DefineControl("srvdupe_browser_panel", "AD2 File Browser", BROWSERPNL, "Panel")
+derma.DefineControl("srvdupe_browser_panel", "Server Dupe File Browser", BROWSERPNL, "Panel")
 
 local BROWSER = {}
 AccessorFunc(BROWSER, "m_pSelectedItem", "SelectedItem")
@@ -221,7 +221,7 @@ local function GetFullPath(node)
     return path
 end
 
-function addOptionsFileClientside(Menu, node)
+local function addOptionsFileClientside(Menu, node)
     Menu:AddOption("Upload", function()
         local path, _ = GetNodePath(node)
         local dataFolder = SrvDupe.AdvDupe2_Data
@@ -239,17 +239,86 @@ function addOptionsFileClientside(Menu, node)
     end)
 end
 
-function addOptionsFileServerside(Menu, node)
+local function optionDelete(node, parent)
+    parent.Submit:SetMaterial("icon16/bin_empty.png")
+    parent.Submit:SetTooltip("Delete File")
+    parent.FileName:SetVisible(false)
+    parent.Desc:SetVisible(false)
+    if (#node.Label:GetText() > 22) then
+        parent.Info:SetText(
+            'Are you sure that you want to delete \nthe FILE, "' ..
+                node.Label:GetText() .. '" \nSERVERSIDE?')
+    else
+        parent.Info:SetText(
+            'Are you sure that you want to delete \nthe FILE, "' ..
+                node.Label:GetText() .. '" SERVERSIDE?')
+    end
+    parent.Info:SetTextColor(color_black)
+    parent.Info:SizeToContents()
+    parent.Info:SetVisible(true)
+    SrvDupe.FileBrowser:Slide(true)
+    parent.Submit.DoClick = function()
+        local path, _ = GetNodePath(node)
+        if not path or path == "" then
+            return
+        end
+
+        net.Start("SrvDupe_AskServerForFileDelete")
+        net.WriteString(path)
+        net.SendToServer()
+        
+        SrvDupe.FileBrowser:Slide(false)
+    end
+end
+
+local function addOptionsFileServerside(Menu, node, parent)
     Menu:AddOption("Rename", function()
 
     end)
 
     Menu:AddOption("Move", function()
+        parent.Submit:SetMaterial("icon16/page_paste.png")
+        parent.Submit:SetTooltip("Move file")
+        parent.FileName:SetVisible(false)
+        parent.Desc:SetVisible(false)
+        parent.Info:SetText(
+            "Select the folder you want to move \nthe file to.")
+        parent.Info:SetTextColor(color_black)
+        parent.Info:SizeToContents()
+        parent.Info:SetVisible(true)
+        SrvDupe.FileBrowser:Slide(true)
+        node.Control.ActionNode = node
+        parent.Submit.DoClick = function()
+            local selectedNode = node.Control.m_pSelectedItem
+            if (not selectedNode) then
+                SrvDupe.Notify("No folder selected", 1, nil)
+                return
+            end
 
+            local node2 = selectedNode.Control.ActionNode
+            local path, area = GetNodePath(node2)
+            local path2, area2 = GetNodePath(selectedNode)
+
+            if (area ~= area2 or path == path2) then
+                SrvDupe.Notify("You can't move files to this folder", 1, nil)
+                return
+            end
+
+            local newPath = SrvDupe.GetFilename(path2 .. "/" .. node2.Label:GetText())
+            local oldPath = path
+
+            net.Start("SrvDupe_AskServerForFileMove")
+            net.WriteString(oldPath)
+            net.WriteString(newPath)
+            net.SendToServer()
+
+            SrvDupe.FileBrowser:Slide(false)
+            SrvDupe.FileBrowser.Info:SetVisible(false)
+        end
     end)
 
     Menu:AddOption("Delete", function()
-
+        optionDelete(node, parent)
     end)
 
     Menu:AddOption("Copy path to clipboard", function()
@@ -269,13 +338,54 @@ function addOptionsFileServerside(Menu, node)
     end)
 end
 
-function addOptionsFolderServerside(Menu, node)
+local function addOptionsFolderServerside(Menu, node, parent)
     Menu:AddOption("New Folder", function()
+        if (parent.Expanding) then return end
+        parent.Submit:SetMaterial("icon16/folder_add.png")
+        parent.Submit:SetTooltip("Add new folder")
+        if (parent.FileName:GetValue() == "file_name") then
+            parent.FileName:SetText("folder_name")
+        end
+        parent.Desc:SetVisible(false)
+        parent.Info:SetVisible(false)
+        parent.FileName.FirstChar = true
+        parent.FileName.PrevText = parent.FileName:GetValue()
+        parent.FileName:SetVisible(true)
+        parent.FileName:SelectAllOnFocus(true)
+        parent.FileName:OnMousePressed()
+        parent.FileName:RequestFocus()
+        parent.Expanding = true
+        SrvDupe.FileBrowser:Slide(true)
 
+        parent.Submit.DoClick = function()
+            if not node.Control then
+                return
+            end
+            local Controller = node.Control:GetParent():GetParent()
+            local name = Controller.FileName:GetValue() or ""
+            local char = string.match(name, "[^%w_ ]")
+            if char or name == "" then
+                SrvDupe.Notify("Invalid folder name", 1, nil)
+                return
+            end
+
+            local path, _ = GetNodePath(node)
+            if not path then
+                return
+            end
+            path = path .. "/" .. name
+
+            net.Start("SrvDupe_AskServerForAddFolder")
+            net.WriteString(path)
+            net.SendToServer()
+
+            SrvDupe.FileBrowser:Slide(false)
+        end
+        parent.FileName.OnEnter = parent.Submit.DoClick
     end)
 
     Menu:AddOption("Delete", function()
-
+        optionDelete(node, parent)
     end)
 end
 
@@ -294,13 +404,13 @@ function BROWSER:DoNodeRightClick(node)
             addOptionsFileClientside(Menu, node)
         end
         if area == 1 then
-            addOptionsFileServerside(Menu, node)
+            addOptionsFileServerside(Menu, node, parent)
         end
     end
 
     if node.Derma.ClassName == "srvdupe_browser_folder" then
         if area == 1 then
-            addOptionsFolderServerside(Menu, node)
+            addOptionsFolderServerside(Menu, node, parent)
         end
     end
 
@@ -326,7 +436,7 @@ function BROWSER:RemoveNode(node)
                 end
             end
         elseif (parent.m_bExpanded) then
-            CollapseParents(parent, 20)
+        CollapseParents(parent, 20)
         end
         for i = 1, #parent.Folders do
             if (node == parent.Folders[i]) then
@@ -473,7 +583,7 @@ function BROWSER:DeleteNode()
     self:RemoveNode(self.ActionNode)
 end
 
-derma.DefineControl("srvdupe_browser_tree", "AD2 File Browser", BROWSER, "Panel")
+derma.DefineControl("srvdupe_browser_tree", "Server Dupe File Browser", BROWSER, "Panel")
 
 local FOLDER = {}
 
@@ -678,7 +788,7 @@ function FOLDER:OnMousePressed(code)
     end
 end
 
-derma.DefineControl("srvdupe_browser_folder", "AD2 Browser Folder node", FOLDER, "Panel")
+derma.DefineControl("srvdupe_browser_folder", "Server Dupe Browser Folder node", FOLDER, "Panel")
 
 local FILE = {}
 
@@ -722,7 +832,7 @@ function FILE:OnMousePressed(code)
     end
 end
 
-derma.DefineControl("srvdupe_browser_file", "AD2 Browser File node", FILE, "Panel")
+derma.DefineControl("srvdupe_browser_file", "Server Dupe Browser File node", FILE, "Panel")
 
 local PANEL = {}
 AccessorFunc(PANEL, "m_bBackground", "PaintBackground", FORCE_BOOL)
@@ -838,6 +948,7 @@ function PANEL:Init()
     self.Help:SizeToContents()
     self.Help:SetTooltip("Help Section")
     self.Help.DoClick = function(btn)
+        --[[
         local Menu = DermaMenu()
         Menu:AddOption("Bug Reporting", function()
             gui.OpenURL("https://github.com/wiremod/advdupe2/issues")
@@ -850,6 +961,7 @@ function PANEL:Init()
                     "https://github.com/wiremod/advdupe2/wiki/Server-settings")
         end)
         Menu:Open()
+        ]]--
     end
 
     self.Submit = vgui.Create("DImageButton", self)
@@ -872,7 +984,7 @@ function PANEL:Init()
 
     self.FileName = vgui.Create("DTextEntry", self)
     self.FileName:SetAllowNonAsciiCharacters(true)
-    self.FileName:SetText("File_Name...")
+    self.FileName:SetText("file_name")
     self.FileName.Last = 0
 
     self.FileName.OnEnter = function()
@@ -883,8 +995,8 @@ function PANEL:Init()
     end
     self.FileName.OnMousePressed = function()
         self.FileName:OnGetFocus()
-        if (self.FileName:GetValue() == "File_Name..." or
-                self.FileName:GetValue() == "Folder_Name...") then
+        if (self.FileName:GetValue() == "file_name" or
+                self.FileName:GetValue() == "folder_name") then
             self.FileName:SelectAllOnFocus(true)
         end
     end
@@ -985,8 +1097,8 @@ function PANEL:Init()
         end
     end
     self.FileName.OnValueChange = function()
-        if (self.FileName:GetValue() ~= "File_Name..." and
-                self.FileName:GetValue() ~= "Folder_Name...") then
+        if (self.FileName:GetValue() ~= "file_name" and
+                self.FileName:GetValue() ~= "folder_name") then
             local new, changed = self.FileName:GetValue():gsub("[^%w_ ]", "")
             if changed > 0 then
                 self.FileName:SetText(new)

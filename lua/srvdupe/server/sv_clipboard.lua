@@ -1073,8 +1073,6 @@ local function ErrorCatchSpawning()
         local status, err = pcall(SrvDupe_Spawn)
 
         if (not status) then
-            -- PUT ERROR LOGGING HERE
-
             if (not SrvDupe.JobManager.Queue) then
                 print("[SrvDupeNotify]\t" .. err)
                 SrvDupe.JobManager.Queue = {}
