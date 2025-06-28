@@ -188,27 +188,6 @@ local function CollapseChildren(node)
     end
 end
 
-local function CollapseParentsComplete(node)
-    if (not node.ParentNode.ParentNode) then
-        node:SetExpanded(false)
-        return
-    end
-    CollapseParentsComplete(node.ParentNode)
-end
-
-function SrvDupe.GetFilename(path, overwrite)
-    if not overwrite and file.Exists(path .. ".txt", "DATA") then
-        for i = 1, 10 do
-            local p = string.format("%s_%03d.txt", path, i)
-            if not file.Exists(p, "DATA") then
-                return p
-            end
-        end
-        return false
-    end
-    return path .. ".txt"
-end
-
 local function GetFullPath(node)
     local path, area = GetNodePath(node)
     if (area == 0) then
@@ -304,7 +283,7 @@ local function addOptionsFileServerside(Menu, node, parent)
                 return
             end
 
-            local newPath = SrvDupe.GetFilename(path2 .. "/" .. node2.Label:GetText())
+            local newPath = path2 .. "/" .. node2.Label:GetText()
             local oldPath = path
 
             net.Start("SrvDupe_AskServerForFileMove")
