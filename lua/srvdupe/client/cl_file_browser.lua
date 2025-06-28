@@ -567,22 +567,6 @@ function BROWSER:Collapse(node)
     CollapseChildren(node)
 end
 
-function BROWSER:RenameNode(name)
-    self.ActionNode.Label:SetText(name)
-    self.ActionNode.Label:SizeToContents()
-    self:Sort(self.ActionNode.ParentNode)
-end
-
-function BROWSER:MoveNode(name)
-    self:RemoveNode(self.ActionNode)
-    self.ActionNode2:AddFile(name)
-    self:Sort(self.ActionNode2)
-end
-
-function BROWSER:DeleteNode()
-    self:RemoveNode(self.ActionNode)
-end
-
 derma.DefineControl("srvdupe_browser_tree", "Server Dupe File Browser", BROWSER, "Panel")
 
 local FOLDER = {}
@@ -652,6 +636,7 @@ function FOLDER:AddFolder(text)
     if (self.m_bExpanded) then
         self.Control:Extend(self)
     end
+    self.Control:Sort(self)
 
     return node
 end
