@@ -649,6 +649,7 @@ local function CreateEntityFromTable(EntTable, Player)
 end
 
 function SrvDupe.FinishPasting(Player, Paste)
+    Player.SrvDupe.Pasting = false
     if(Paste) then SrvDupe.Notify("Finished Pasting!", 0, nil, Player, false) end
 end
 
@@ -1224,8 +1225,14 @@ function SrvDupe.LoadAndPaste(path, position, angle, plyRequestor, onUndoCallbac
     local success, dupe, info, moreinfo = SrvDupe.LoadFile(path)
 
     if not success then
-        return false
+        return false, "Failed to load the dupe"
     end
+
+    if (plyRequestor.SrvDupe and plyRequestor.SrvDupe.Pasting) then
+        return false, "Server Duplicator is busy"
+    end
+    plyRequestor.SrvDupe.Pasting = true
+
 
     print("[SrvDupe]\t".. path .. " loaded successfully.")
 
