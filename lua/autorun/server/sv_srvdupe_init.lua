@@ -3,6 +3,7 @@ SrvDupe = {
     old_CheckLimit = nil,
     old_CheckRestriction = nil,
     old_AddCount = nil,
+    appliedCustomRestrictions = false,
 }
 
 print("[SrvDupe]\tHello World!")
@@ -10,6 +11,9 @@ print("[SrvDupe]\tHello World!")
 if not file.Exists(SrvDupe.DataFolder, "DATA") then
     file.CreateDir(SrvDupe.DataFolder)
 end
+
+CreateConVar("SrvDupe_SpawnRate", "1", {FCVAR_ARCHIVE})
+CreateConVar("SrvDupe_Strict", "0", {FCVAR_ARCHIVE}, "Prevents entities from being duped with unauthorized data. Can fix certain exploits at the cost of some entities potentially duping incorrectly")
 
 AddCSLuaFile("config/sh_srvdupe_config.lua")
 AddCSLuaFile("srvdupe/sh_codec.lua")
@@ -45,7 +49,7 @@ function SrvDupe.Notify(msg, typ, dur, ply, showsrv)
 end
 
 function SrvDupe.ApplyCustomRestrictions()
-    if SrvDupe.old_CheckLimit or SrvDupe.old_CheckRestriction then return end
+    if SrvDupe.appliedCustomRestrictions then return end
 
     local ENT = FindMetaTable("Player")
 
@@ -56,10 +60,12 @@ function SrvDupe.ApplyCustomRestrictions()
     ENT.CheckLimit = function(ply, ent) return true end
     ENT.CheckRestriction = function(ply, ent) return true end
     ENT.AddCount = function (str, ent) return end
+
+    SrvDupe.appliedCustomRestrictions = true
 end
 
 function SrvDupe.RevertCustomRestrictions()
-    if not SrvDupe.old_CheckLimit or not SrvDupe.old_CheckRestriction then return end
+    if not SrvDupe.appliedCustomRestrictions then return end
 
     local ENT = FindMetaTable("Player")
 
@@ -70,6 +76,8 @@ function SrvDupe.RevertCustomRestrictions()
     SrvDupe.old_CheckLimit = nil
     SrvDupe.old_CheckRestriction = nil
     SrvDupe.old_AddCount = nil
+
+    SrvDupe.appliedCustomRestrictions = false
 end
 
 hook.Add("PlayerInitialSpawn","SrvDupe_AddPlayerTable",function(ply)
@@ -101,9 +109,6 @@ util.AddNetworkString("SrvDupe_AskServerForFile")
 util.AddNetworkString("SrvDupe_AskServerForFileDelete")
 util.AddNetworkString("SrvDupe_AskServerForAddFolder")
 util.AddNetworkString("SrvDupe_AskServerForFileMove")
-
-CreateConVar("SrvDupe_SpawnRate", "1", {FCVAR_ARCHIVE})
-CreateConVar("SrvDupe_Strict", "0", {FCVAR_ARCHIVE}, "Prevents entities from being duped with unauthorized data. Can fix certain exploits at the cost of some entities potentially duping incorrectly")
 
 hook.Run("SrvDupe_PostInit")
 

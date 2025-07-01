@@ -697,8 +697,10 @@ function SrvDupe.duplicator.Paste(Player, EntityList, ConstraintList, Position, 
             Ent.PhysicsObjects = table.Copy(v.PhysicsObjects)
             if (v.CollisionGroup) then Ent:SetCollisionGroup(v.CollisionGroup) end
             if (Ent.OnDuplicated) then Ent:OnDuplicated(v) end
+            SrvDupe.ApplyCustomRestrictions()
             ApplyEntityModifiers(Player, Ent)
             ApplyBoneModifiers(Player, Ent)
+            SrvDupe.RevertCustomRestrictions()
             Ent.SolidMod = not Ent:IsSolid()
             Ent:SetNotSolid(true)
         elseif (Ent == false) then
@@ -716,7 +718,9 @@ function SrvDupe.duplicator.Paste(Player, EntityList, ConstraintList, Position, 
     -- Create constraints
     --
     for k, Constraint in pairs(ConstraintList) do
+        SrvDupe.ApplyCustomRestrictions()
         Entity = CreateConstraintFromTable(Constraint, CreatedEntities, EntityList, Player)
+        SrvDupe.RevertCustomRestrictions()
         if (IsValid(Entity)) then
             table.insert(CreatedConstraints, Entity)
         end
@@ -886,8 +890,10 @@ local function SrvDupe_Spawn()
         if (Queue.Current > #Queue.SortedEntities) then
 
             for _, Ent in pairs(Queue.CreatedEntities) do
+                SrvDupe.ApplyCustomRestrictions()
                 ApplyEntityModifiers(Queue.Player, Ent)
                 ApplyBoneModifiers(Queue.Player, Ent)
+                SrvDupe.RevertCustomRestrictions()
 
                 -- If the entity has a PostEntityPaste function tell it to use it now
                 if Ent.PostEntityPaste then
@@ -921,8 +927,10 @@ local function SrvDupe_Spawn()
                 return
             end
 
+            SrvDupe.ApplyCustomRestrictions()
             local Entity = CreateConstraintFromTable(Queue.ConstraintList[Queue.Current], Queue.CreatedEntities,
                     Queue.EntityList, Queue.Player, true)
+            SrvDupe.RevertCustomRestrictions()
             if IsValid(Entity) then
                 table.insert(Queue.CreatedConstraints, Entity)
             end

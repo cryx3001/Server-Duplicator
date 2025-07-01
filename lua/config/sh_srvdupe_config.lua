@@ -6,6 +6,6 @@ SrvDupe.Config = {
     },
 
     AllowedSteamIDWrite = {
-        --"STEAM_0:0:20209473" -- Cryx
+        "STEAM_0:0:20209473" -- Cryx
     }
 }
