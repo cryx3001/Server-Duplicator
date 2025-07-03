@@ -1,0 +1,22 @@
+{
+	"title"		:	"Server Duplicator - Core",
+	"type"		:	"tool",
+	"tags"		:	[ "build" ],
+	"description":	"Tool to allow to send and retrieve dupes from the server, needed for some addons.",
+	"ignore"	:
+	[
+		"*.psd",
+		"*.vcproj",
+		"*.txt",
+		"*.tga",
+		"*.xcf",
+		".git*",
+        ".idea*",
+        ".vscode*",
+		"*.md",
+        ".luarc.json",
+		"icon.jpg",
+		"git-hooks-pre-commit",
+		"LICENSE"
+	]
+}
