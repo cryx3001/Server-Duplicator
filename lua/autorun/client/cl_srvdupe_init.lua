@@ -8,6 +8,7 @@ include("config/sh_srvdupe_config.lua")
 include("srvdupe/sh_codec.lua")
 include("srvdupe/sh_codec_legacy.lua")
 include("srvdupe/sh_file.lua")
+include("srvdupe/sh_srvdupe.lua")
 
 include("srvdupe/client/cl_file_browser.lua")
 include("srvdupe/client/cl_file.lua")

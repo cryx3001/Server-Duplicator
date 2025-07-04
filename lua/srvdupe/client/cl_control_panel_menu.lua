@@ -1,11 +1,6 @@
-local function isAllowed()
-    local roles = SrvDupe.Config.AllowedRolesWrite or {}
-    return table.HasValue(roles, LocalPlayer():GetUserGroup())
-end
-
 local function BuildControlPanel(CPanel)
-    if not isAllowed() then
-        CPanel:Help("You don't have the permission to access this menu."):SetColor(Color(150, 50, 0, 255))
+    if not SrvDupe.CheckPlyWritePermissions(LocalPlayer()) then
+        CPanel:Help("You don't have the needed permissions to access this menu."):SetColor(Color(150, 50, 0, 255))
         return
     end
 
